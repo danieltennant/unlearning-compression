@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+
+# Results and checkpoints
+results/*.csv
+results/*.json
+*.ckpt
+*.bin
+*.safetensors
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Environment
+.env
+
+# macOS
+.DS_Store
+
+# wandb
+wandb/
