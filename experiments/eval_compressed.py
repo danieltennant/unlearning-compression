@@ -82,12 +82,11 @@ def build_eval_cfg(
             overrides=[
                 f"model={model_name}",
                 "task_name=eval_compressed",
-                f"paths.output_dir={output_dir}",
-                f"+eval.tofu.forget_split={forget_split}",
-                f"+eval.tofu.holdout_split={holdout_split}",
-                f"+eval.tofu.retain_logs_path={retain_logs_path}",
-                f"+eval.tofu.output_dir={output_dir}",
-                "+eval.tofu.overwrite=true",
+                f"eval.tofu.forget_split={forget_split}",
+                f"eval.tofu.holdout_split={holdout_split}",
+                f"++eval.tofu.retain_logs_path={retain_logs_path}",
+                f"eval.tofu.output_dir={output_dir}",
+                "eval.tofu.overwrite=true",
             ],
         )
 
