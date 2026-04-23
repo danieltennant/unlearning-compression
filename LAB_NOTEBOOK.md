@@ -6,34 +6,31 @@ Entries in reverse chronological order (newest first).
 
 ## 2026-04-23 — Third session: pruning and SVD sweep
 
-### Key finding: quantization is uniquely dangerous; structural compression just breaks the model
+### Finding: pruning and SVD are not meaningful compression methods for a 1B model
 
 GradDiff α1 baseline: forget_Q_A_Prob = 0.061, model_utility = 0.456
 
 | Method | forget_truth_ratio | forget_Q_A_Prob | model_utility | Notes |
 |--------|-------------------|-----------------|---------------|-------|
 | 4-bit quantize | 0.534 | **0.359** | **0.440** | 6× recovery, utility intact |
-| prune 30% | 0.630 | 0.126 | 0.279 | 2× recovery, utility damaged |
+| prune 30% | 0.630 | 0.126 | 0.279 | Model degraded |
 | prune 50% | 0.743 | ~0 | **0.0** | Model broken |
 | prune 70% | 0.855 | ~0 | **0.0** | Model broken |
 | svd 90% | 0.828 | ~0 | **0.0** | Model broken |
 | svd 70% | 0.920 | ~0 | **0.0** | Model broken |
 | svd 50% | 0.886 | ~0 | **0.0** | Model broken |
 
-The elevated `forget_truth_ratio` for broken models (prune ≥50%, all SVD) is an artifact — when a model outputs garbage, the ratio metric becomes unreliable. `forget_Q_A_Prob ≈ 0` for those cases confirms they can't generate meaningful answers.
+At all tested levels, unstructured magnitude pruning and SVD truncation either degrade or completely destroy model utility. The elevated `forget_truth_ratio` values for broken models are artifacts of a non-functional model, not evidence of knowledge recovery. We can't draw any conclusions about unlearning from these runs because the compression itself is too destructive to evaluate meaningfully.
 
-### Interpretation
+This is a known limitation of these techniques on small (1B) models rather than a finding about unlearning. These experiments don't add to the paper narrative.
 
-Quantization is uniquely dangerous to unlearned models because it targets small-magnitude weight perturbations — exactly what utility-constrained unlearning (GradDiff, NPO) produces — while leaving large weights intact. This recovers 6× suppressed knowledge with only 1% utility loss.
-
-Pruning does the opposite: it zeros out the *largest* magnitude weights, breaking the model broadly rather than surgically recovering knowledge. SVD truncation is even more destructive — all retain ratios tested completely break the model (model_utility = 0.0).
-
-This supports and extends Guo et al.: quantization is a practical real-world threat (model remains useful after the attack), while structural compression is not (model is too broken to be useful).
+### Open question
+Whether lighter pruning (5–15% sparsity) on this model, or the same techniques on a larger model (7B+), would show a cleaner result is unknown. Not worth pursuing on 1B without a clearer motivation.
 
 ### Next steps
-- Consider adding 8-bit quantization to compare recovery magnitude vs 4-bit
-- Consider a SimNPO checkpoint with lower baseline forget_Q_A_Prob to confirm results generalise across methods
-- Begin writing up results
+- 8-bit quantization to compare recovery magnitude vs 4-bit
+- SimNPO checkpoint to confirm quantization result generalises across unlearning methods
+- Begin writing up the core quantization result
 
 ---
 
