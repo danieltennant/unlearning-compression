@@ -18,10 +18,13 @@
 
 set -e
 
-# Load tokens from /root/.env if present
-if [ -f /root/.env ]; then
-    export $(grep -v '^#' /root/.env | xargs)
-fi
+# Load tokens from .env if present
+for env_file in /workspace/.env /root/.env; do
+    if [ -f "$env_file" ]; then
+        export $(grep -v '^#' "$env_file" | xargs)
+        break
+    fi
+done
 
 REPO_URL="https://${GITHUB_TOKEN}@github.com/danieltennant/unlearning-compression.git"
 WORK_DIR="/tmp/unlearning-compression"
