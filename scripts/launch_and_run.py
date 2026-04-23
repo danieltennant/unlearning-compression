@@ -27,7 +27,6 @@ import requests
 # ---------------------------------------------------------------------------
 GPU_TYPE_ID = "NVIDIA GeForce RTX 4090"
 CONTAINER_IMAGE = "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04"
-TEMPLATE_ID = "runpod-torch-v240"
 CONTAINER_DISK_GB = 20
 VOLUME_MOUNT_PATH = "/workspace"
 DATACENTER_ID = "EU-RO-1"
@@ -65,7 +64,6 @@ def create_pod(api_key: str, volume_id: str) -> str:
             "gpuTypeId": GPU_TYPE_ID,
             "gpuCount": 1,
             "imageName": CONTAINER_IMAGE,
-            "templateId": TEMPLATE_ID,
             "containerDiskInGb": CONTAINER_DISK_GB,
             "networkVolumeId": volume_id,
             "volumeMountPath": VOLUME_MOUNT_PATH,
