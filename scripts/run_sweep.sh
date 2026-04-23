@@ -67,7 +67,7 @@ for entry in "${EXPERIMENTS[@]}"; do
     git add "results/$output_label/"
     git add results/  # picks up summary.csv updates
     git commit -m "Results: $output_label" || echo "(nothing new to commit)"
-    git push
+    git pull --rebase && git push
 done
 
 echo ""
