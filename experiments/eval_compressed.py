@@ -47,15 +47,18 @@ def load_model(model_id: str, compression: str, level: float):
             model_id, torch_dtype=torch.float16, device_map="auto"
         )
         tokenizer = AutoTokenizer.from_pretrained(model_id)
-        return model, tokenizer
     elif compression == "quantize":
-        return load_quantized(model_id, bits=int(level))
+        model, tokenizer = load_quantized(model_id, bits=int(level))
     elif compression == "prune":
-        return load_and_prune(model_id, sparsity=level)
+        model, tokenizer = load_and_prune(model_id, sparsity=level)
     elif compression == "svd":
-        return load_and_truncate(model_id, retain_ratio=level)
+        model, tokenizer = load_and_truncate(model_id, retain_ratio=level)
     else:
         raise ValueError(f"Unknown compression method: {compression}")
+
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    return model, tokenizer
 
 
 def build_eval_cfg(
@@ -141,10 +144,17 @@ def main():
         output_dir=run_output_dir,
     )
 
-    # Load template_args from model config if available; fall back to minimal defaults
+    # Load template_args from model config if available; fall back to minimal defaults.
+    # Note: set apply_chat_template=False for models without a chat template (e.g. gpt2).
+    # The tag fields are always required by the evaluator's non-chat-template path.
+    apply_chat = args.model_id not in ("gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl")
     template_args = OmegaConf.create({
-        "apply_chat_template": True,
+        "apply_chat_template": apply_chat,
         "system_prompt": "You are a helpful assistant.",
+        "user_start_tag": "\nUser: ",
+        "user_end_tag": "\n",
+        "asst_start_tag": "Assistant: ",
+        "asst_end_tag": "\n",
     })
 
     print("Running TOFU evaluation...")

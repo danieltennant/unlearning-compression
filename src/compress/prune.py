@@ -27,9 +27,15 @@ def apply_magnitude_pruning(
     all_weights = []
     for module in model.modules():
         if isinstance(module, nn.Linear):
-            all_weights.append(module.weight.data.abs().flatten())
+            all_weights.append(module.weight.data.abs().flatten().float())
 
-    threshold = torch.quantile(torch.cat(all_weights), sparsity)
+    # torch.quantile has a size limit; sample up to 10M elements for threshold estimation
+    combined = torch.cat(all_weights)
+    max_elements = 10_000_000
+    if combined.numel() > max_elements:
+        idx = torch.randperm(combined.numel())[:max_elements]
+        combined = combined[idx]
+    threshold = torch.quantile(combined, sparsity)
 
     for module in model.modules():
         if isinstance(module, nn.Linear):

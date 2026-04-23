@@ -2,9 +2,11 @@
 
 Does compression reverse machine unlearning?
 
-[Guo et al. (2024)](https://arxiv.org/abs/2410.16454) showed that quantizing an unlearned LLM recovers 83% of supposedly forgotten knowledge on average. This project intends to first replicate that finding, and then extend to magnitude pruning and SVD truncation, using the 450+ pre-trained unlearned checkpoints from [open-unlearning](https://github.com/locuslab/open-unlearning) and the [TOFU](https://locuslab.github.io/tofu/) benchmark.
+[Guo et al. (2024)](https://arxiv.org/abs/2410.16454) showed that quantizing an unlearned LLM recovers 83% of supposedly forgotten knowledge on average, using NEWS and BOOKS datasets. This project translates that finding to the [TOFU](https://locuslab.github.io/tofu/) benchmark — a standardized unlearning testbed with 450+ public checkpoints via [open-unlearning](https://github.com/locuslab/open-unlearning) — and extends it to magnitude pruning and SVD truncation.
 
-If the failure generalizes across compression methods, it strengthens the case that current unlearning is suppression rather than erasure. If it doesn't, that would suggest something specific about how quantization interacts with unlearning weight perturbations — which points toward fixes.
+The core hypothesis transfers: if utility-constrained unlearning suppresses rather than erases knowledge, that should be visible under any compression method that reduces weight perturbations, not just quantization. TOFU provides a cleaner test than NEWS/BOOKS because the forget set is entirely synthetic, eliminating confounds from the model's pretraining exposure.
+
+If the failure generalizes across compression methods, it substantially weakens the safety case for unlearning as a capability control. If it doesn't, that points toward something specific about how quantization interacts with unlearning weight perturbations — which is equally useful for understanding fixes.
 
 ## Setup
 
@@ -37,7 +39,9 @@ open-unlearning/    # submodule — eval harness and checkpoints
 
 ## Results
 
-None yet - will evaluate on Llama 3.2 1B and Llama 3.1 8B across four unlearning methods (GradAscent, NPO, GradDiff, RMU) at 5% and 10% forget fractions.
+Full evaluation results pending — will run on Llama 3.2 1B and Llama 3.1 8B across four unlearning methods (GradAscent, NPO, GradDiff, RMU) at 5% and 10% forget fractions via RunPod.
+
+**Local validation (Apr 2026):** End-to-end pipeline validated locally on GPT-2 with magnitude pruning. Model loading, compression, Hydra config composition, TOFU data download, and the eval loop all run correctly. Two metrics (forget_Q_A_Prob, forget_Q_A_ROUGE) completed successfully on CPU. The `forget_quality` metric requires pre-computed retain logs from the target checkpoint, which will be available when running against real open-unlearning checkpoints on RunPod.
 
 ## Metrics
 
