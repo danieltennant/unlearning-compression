@@ -156,6 +156,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="Print config and exit")
     parser.add_argument("--no-terminate", action="store_true", help="Leave pod running after sweep")
+    parser.add_argument("--sweep", default=None, help="Sweep file to run (e.g. sweeps/2026-04-23-followup.sh)")
     args = parser.parse_args()
 
     api_key = os.environ.get("RUNPOD_API_KEY")
@@ -191,8 +192,9 @@ def main():
         # Give the SSH daemon a moment to fully start
         time.sleep(5)
 
+        sweep = args.sweep or "sweeps/2026-04-23-followup.sh"
         ssh_run(host, port, key_path, "bash /workspace/unlearning-compression/scripts/session_start.sh")
-        ssh_run(host, port, key_path, "bash /workspace/unlearning-compression/scripts/run_sweep.sh")
+        ssh_run(host, port, key_path, f"nohup bash /workspace/unlearning-compression/scripts/run_sweep.sh {sweep} > /workspace/sweep.log 2>&1")
 
     finally:
         if args.no_terminate:
