@@ -16,7 +16,7 @@ cd /workspace/unlearning-compression
 git pull
 
 echo "=== Syncing dependencies ==="
-uv sync
+uv sync || uv sync
 
 echo "=== Loading environment ==="
 if [ -f /workspace/.env ]; then
