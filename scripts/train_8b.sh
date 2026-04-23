@@ -45,16 +45,18 @@ python setup_data.py
 echo "=== Training GradDiff alpha1 on Llama-3.1-8B-Instruct ==="
 cd "$OPEN_UNLEARNING_DIR"
 uv run python src/train.py \
+    +experiment/unlearn/tofu=default \
     model=Llama-3.1-8B-Instruct \
+    'model.model_args.pretrained_model_name_or_path=open-unlearning/tofu_Llama-3.1-8B-Instruct_full' \
     trainer=GradDiff \
     'trainer.method_args.alpha=1.0' \
     'trainer.args.learning_rate=1e-5' \
     'trainer.args.num_train_epochs=10' \
     'trainer.args.per_device_train_batch_size=2' \
     'trainer.args.gradient_accumulation_steps=16' \
-    data=tofu \
-    'data.forget_split=forget10' \
-    'data.retain_split=retain90' \
+    'trainer.args.gradient_checkpointing=true' \
+    forget_split=forget10 \
+    retain_split=retain90 \
     task_name=tofu_Llama-3.1-8B-Instruct_forget10_GradDiff_lr1e-05_alpha1_epoch10 \
     "paths.output_dir=$CHECKPOINT_DIR"
 
