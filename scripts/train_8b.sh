@@ -36,8 +36,13 @@ pip install uv --quiet
 export UV_LINK_MODE=copy
 
 echo "=== Cloning repo ==="
-git clone "$REPO_URL" "$WORK_DIR"
-cd "$WORK_DIR"
+if [ -d "$WORK_DIR/.git" ]; then
+    cd "$WORK_DIR"
+    git pull
+else
+    git clone "$REPO_URL" "$WORK_DIR"
+    cd "$WORK_DIR"
+fi
 git config --global user.email "danieltennant@users.noreply.github.com"
 git config --global user.name "Daniel Tennant"
 git submodule update --init --recursive
