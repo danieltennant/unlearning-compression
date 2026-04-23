@@ -6,8 +6,7 @@ __pycache__/
 dist/
 
 # Results and checkpoints
-results/*.csv
-results/*.json
+results/
 *.ckpt
 *.bin
 *.safetensors
