@@ -48,7 +48,7 @@ uv run huggingface-cli login --token "$HF_TOKEN"
 
 echo "=== Setting up TOFU data ==="
 cd "$OPEN_UNLEARNING_DIR"
-python setup_data.py
+uv run python setup_data.py
 
 echo "=== Training GradDiff alpha1 on Llama-3.1-8B-Instruct ==="
 cd "$OPEN_UNLEARNING_DIR"
