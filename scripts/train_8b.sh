@@ -55,6 +55,10 @@ echo "=== Setting up TOFU data ==="
 cd "$OPEN_UNLEARNING_DIR"
 uv run python setup_data.py
 
+echo "=== Installing deepspeed (required by open-unlearning) ==="
+cd "$WORK_DIR"
+uv run pip install deepspeed --quiet
+
 echo "=== Training GradDiff alpha1 on Llama-3.1-8B-Instruct ==="
 cd "$OPEN_UNLEARNING_DIR"
 uv run python src/train.py \
