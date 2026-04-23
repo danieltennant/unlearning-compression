@@ -1,10 +1,84 @@
 # Lab Notebook — Unlearning Compression
 
-Chronological record of experiments, findings, and decisions.
+Entries in reverse chronological order (newest first).
 
 ---
 
-## 2026-04-23 — Initial pipeline validation and first RunPod runs
+## 2026-04-23 — Third session: pruning and SVD sweep
+
+### Key finding: quantization is uniquely dangerous; structural compression just breaks the model
+
+GradDiff α1 baseline: forget_Q_A_Prob = 0.061, model_utility = 0.456
+
+| Method | forget_truth_ratio | forget_Q_A_Prob | model_utility | Notes |
+|--------|-------------------|-----------------|---------------|-------|
+| 4-bit quantize | 0.534 | **0.359** | **0.440** | 6× recovery, utility intact |
+| prune 30% | 0.630 | 0.126 | 0.279 | 2× recovery, utility damaged |
+| prune 50% | 0.743 | ~0 | **0.0** | Model broken |
+| prune 70% | 0.855 | ~0 | **0.0** | Model broken |
+| svd 90% | 0.828 | ~0 | **0.0** | Model broken |
+| svd 70% | 0.920 | ~0 | **0.0** | Model broken |
+| svd 50% | 0.886 | ~0 | **0.0** | Model broken |
+
+The elevated `forget_truth_ratio` for broken models (prune ≥50%, all SVD) is an artifact — when a model outputs garbage, the ratio metric becomes unreliable. `forget_Q_A_Prob ≈ 0` for those cases confirms they can't generate meaningful answers.
+
+### Interpretation
+
+Quantization is uniquely dangerous to unlearned models because it targets small-magnitude weight perturbations — exactly what utility-constrained unlearning (GradDiff, NPO) produces — while leaving large weights intact. This recovers 6× suppressed knowledge with only 1% utility loss.
+
+Pruning does the opposite: it zeros out the *largest* magnitude weights, breaking the model broadly rather than surgically recovering knowledge. SVD truncation is even more destructive — all retain ratios tested completely break the model (model_utility = 0.0).
+
+This supports and extends Guo et al.: quantization is a practical real-world threat (model remains useful after the attack), while structural compression is not (model is too broken to be useful).
+
+### Next steps
+- Consider adding 8-bit quantization to compare recovery magnitude vs 4-bit
+- Consider a SimNPO checkpoint with lower baseline forget_Q_A_Prob to confirm results generalise across methods
+- Begin writing up results
+
+---
+
+## 2026-04-23 — Second session: core result replicated on TOFU
+
+### Key finding: 4-bit quantization recovers suppressed knowledge (Guo et al. effect confirmed)
+
+Oracle reference: `forget_truth_ratio = 0.628`
+
+| Method | Compression | forget_truth_ratio | forget_Q_A_Prob | forget_Q_A_ROUGE | model_utility |
+|--------|-------------|-------------------|-----------------|------------------|---------------|
+| GradDiff α1 | none | 0.449 | **0.061** | 0.366 | 0.456 |
+| GradDiff α1 | 4-bit | 0.534 | **0.359** | 0.414 | 0.440 |
+| SimNPO | none | 0.514 | **0.110** | 0.381 | 0.592 |
+| SimNPO | 4-bit | 0.560 | **0.223** | 0.381 | 0.453 |
+
+**GradDiff α1** shows the clearest effect: `forget_Q_A_Prob` increases from 0.061 → 0.359 after 4-bit quantization (**6× increase**). The model had genuinely suppressed knowledge of the forget set at full precision, and quantization recovers most of it. Critically, model utility barely changes (0.456 → 0.440), consistent with Guo et al.'s theory: utility-constrained unlearning produces small weight perturbations that quantization grid-snapping washes out.
+
+**SimNPO** shows the same direction but weaker: 0.110 → 0.223 (2× increase).
+
+### The alpha parameter explains everything
+
+Comparing GradDiff α5 (from first session) vs α1:
+
+| Method | forget_Q_A_Prob (full precision) | forget_Q_A_Prob (4-bit) | Direction |
+|--------|----------------------------------|--------------------------|-----------|
+| GradDiff α5 (weak unlearning) | 0.654 | 0.453 | ↓ decrease (quantization noise) |
+| GradDiff α1 (strong unlearning) | 0.061 | 0.359 | ↑ 6× increase (knowledge recovery) |
+
+α5 weights retain loss 5× more than forget loss → weak suppression, nothing to recover. α1 (equal weighting) achieves real suppression, which is then fragile to quantization. This contrast cleanly demonstrates the mechanism.
+
+### Lessons
+- `forget_Q_A_Prob` is the best primary metric for the Guo et al. analog (more sensitive than forget_truth_ratio)
+- The recovery effect is only visible when baseline unlearning is genuine (low forget_Q_A_Prob at full precision)
+- Model utility degradation from 4-bit quantization is minimal for well-unlearned models (~1%), consistent with small-perturbation hypothesis
+
+### Next steps
+- Run pruning experiments (magnitude pruning at various sparsity levels) on GradDiff α1
+- Run SVD truncation experiments on GradDiff α1
+- Compare compression methods: does pruning show the same recovery? At what sparsity threshold?
+- Consider running on SimNPO with stronger hyperparameters to get lower baseline forget_Q_A_Prob
+
+---
+
+## 2026-04-23 — First session: pipeline validation and initial quantization experiments
 
 ### Infrastructure
 - Created 100GB RunPod network volume in EU-RO-1 (persists independently of pods)
@@ -58,8 +132,6 @@ loss = self.gamma * forget_loss + self.alpha * retain_loss
 
 Higher `alpha` = more weight on retain loss = more conservative unlearning = worse forget-set suppression. Default config (`alpha=1`) achieves `forget_truth_ratio ≈ 3.5e-27` per repro.md. We ran `alpha=5` which under-unlearns.
 
-### Next steps → see 2026-04-23 second session below
-
 ---
 
 ## Notes on metrics
@@ -73,44 +145,3 @@ Higher `alpha` = more weight on retain loss = more conservative unlearning = wor
 | `model_utility` | Retain-set performance (model still useful?) | High |
 
 For demonstrating the Guo et al. effect, `forget_Q_A_Prob` turns out to be the clearest metric — it measures absolute probability of correct forget-set answers and shows dramatic changes in well-unlearned models. `forget_truth_ratio` is also useful as a relative measure robust to general quality degradation.
-
----
-
-## 2026-04-23 — Second session: core result replicated on TOFU
-
-### Key finding: 4-bit quantization recovers suppressed knowledge (Guo et al. effect confirmed)
-
-Oracle reference: `forget_truth_ratio = 0.628`
-
-| Method | Compression | forget_truth_ratio | forget_Q_A_Prob | forget_Q_A_ROUGE | model_utility |
-|--------|-------------|-------------------|-----------------|------------------|---------------|
-| GradDiff α1 | none | 0.449 | **0.061** | 0.366 | 0.456 |
-| GradDiff α1 | 4-bit | 0.534 | **0.359** | 0.414 | 0.440 |
-| SimNPO | none | 0.514 | **0.110** | 0.381 | 0.592 |
-| SimNPO | 4-bit | 0.560 | **0.223** | 0.381 | 0.453 |
-
-**GradDiff α1** shows the clearest effect: `forget_Q_A_Prob` increases from 0.061 → 0.359 after 4-bit quantization (**6× increase**). The model had genuinely suppressed knowledge of the forget set at full precision, and quantization recovers most of it. Critically, model utility barely changes (0.456 → 0.440), consistent with Guo et al.'s theory: utility-constrained unlearning produces small weight perturbations that quantization grid-snapping washes out.
-
-**SimNPO** shows the same direction but weaker: 0.110 → 0.223 (2× increase).
-
-### The alpha parameter explains everything
-
-Comparing GradDiff α5 (from first session) vs α1:
-
-| Method | forget_Q_A_Prob (full precision) | forget_Q_A_Prob (4-bit) | Direction |
-|--------|----------------------------------|--------------------------|-----------|
-| GradDiff α5 (weak unlearning) | 0.654 | 0.453 | ↓ decrease (quantization noise) |
-| GradDiff α1 (strong unlearning) | 0.061 | 0.359 | ↑ 6× increase (knowledge recovery) |
-
-α5 weights retain loss 5× more than forget loss → weak suppression, nothing to recover. α1 (equal weighting) achieves real suppression, which is then fragile to quantization. This contrast cleanly demonstrates the mechanism.
-
-### Lessons
-- `forget_Q_A_Prob` is the best primary metric for the Guo et al. analog (more sensitive than forget_truth_ratio)
-- The recovery effect is only visible when baseline unlearning is genuine (low forget_Q_A_Prob at full precision)
-- Model utility degradation from 4-bit quantization is minimal for well-unlearned models (~1%), consistent with small-perturbation hypothesis
-
-### Next steps
-- Run pruning experiments (magnitude pruning at various sparsity levels) on GradDiff α1
-- Run SVD truncation experiments on GradDiff α1
-- Compare compression methods: does pruning show the same recovery? At what sparsity threshold?
-- Consider running on SimNPO with stronger hyperparameters to get lower baseline forget_Q_A_Prob
