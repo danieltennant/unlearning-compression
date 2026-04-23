@@ -5,8 +5,14 @@ __pycache__/
 .venv/
 dist/
 
-# Results and checkpoints
-results/
+# Raw per-run eval output (verbose, not useful in git)
+results/**/TOFU_EVAL.json
+results/**/TOFU_SUMMARY.json
+
+# Checkpoints
+*.ckpt
+*.bin
+*.safetensors
 *.ckpt
 *.bin
 *.safetensors
