@@ -4,6 +4,33 @@ Entries in reverse chronological order (newest first).
 
 ---
 
+## 2026-04-23 — Fourth session: 8-bit quantization follow-up
+
+### Quantization comparison across precision levels
+
+GradDiff α1 and SimNPO across three quantization levels (all on 1B model, TOFU forget10):
+
+| Method | Compression | forget_Q_A_Prob | model_utility |
+|--------|-------------|-----------------|---------------|
+| GradDiff α1 | none | **0.061** | 0.456 |
+| GradDiff α1 | 4-bit | **0.359** | 0.440 |
+| GradDiff α1 | 8-bit | **0.066** | 0.449 |
+| SimNPO | none | **0.110** | 0.592 |
+| SimNPO | 4-bit | **0.223** | 0.453 |
+| SimNPO | 8-bit | **0.123** | 0.591 |
+
+8-bit quantization produces negligible change in `forget_Q_A_Prob` relative to full precision — GradDiff α1: 0.061 → 0.066, SimNPO: 0.110 → 0.123. The large recovery effect seen in 4-bit is not present at 8-bit. Model utility is similarly unaffected by 8-bit.
+
+### Context: Guo et al. 2024
+
+The original paper ("Catastrophic Failure of LLM Unlearning via Quantization", ICLR 2025) used the MUSE benchmark (NEWS and BOOKS datasets), not TOFU. Their primary result was with 4-bit (post-training) quantization on models including Llama3-8B. The abstract reports an average of 21% forgotten knowledge retention at full precision, rising to 83% after 4-bit quantization. The paper also tested 8-bit but the headline claim is about 4-bit. Our 8-bit result on 1B/TOFU is directionally consistent with their finding that 8-bit is far less damaging than 4-bit.
+
+### Next steps
+- Train GradDiff α1 on Llama-3.1-8B-Instruct and run the same quantization sweep
+- Compare whether the 4-bit recovery effect is stronger or weaker at 8B
+
+---
+
 ## 2026-04-23 — Third session: pruning and SVD sweep
 
 ### Finding: pruning and SVD are not meaningful compression methods for a 1B model
