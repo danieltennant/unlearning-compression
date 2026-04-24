@@ -67,6 +67,7 @@ export HYDRA_FULL_ERROR=1
 cd "$OPEN_UNLEARNING_DIR"
 uv run python src/train.py \
     +experiment/unlearn/tofu=default \
+    mode=unlearn \
     model=Llama-3.1-8B-Instruct \
     'model.model_args.pretrained_model_name_or_path=open-unlearning/tofu_Llama-3.1-8B-Instruct_full' \
     trainer=GradDiff \
