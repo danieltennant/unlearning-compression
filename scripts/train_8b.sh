@@ -79,7 +79,7 @@ uv run python src/train.py \
     'trainer.args.gradient_accumulation_steps=16' \
     'trainer.args.gradient_checkpointing=true' \
     'model.model_args.attn_implementation=eager' \
-    'trainer.args.remove_unused_columns=false' \
+    '++trainer.args.remove_unused_columns=false' \
     forget_split=forget10 \
     retain_split=retain90 \
     task_name=tofu_Llama-3.1-8B-Instruct_forget10_GradDiff_lr1e-05_alpha1_epoch10 \
