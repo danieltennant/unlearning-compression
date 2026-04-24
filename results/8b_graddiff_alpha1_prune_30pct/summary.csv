@@ -1,0 +1,2 @@
+model_id,compression,level,forget_truth_ratio,forget_quality,forget_Q_A_Prob,forget_Q_A_ROUGE,model_utility,privleak,extraction_strength
+/workspace/checkpoint_8b,prune,0.3,0.5057200635383378,2.8138576976529647e-20,0.938333740234375,0.8729703143543769,0.6305439163127332,-99.51124998009779,0.7397049994117916
