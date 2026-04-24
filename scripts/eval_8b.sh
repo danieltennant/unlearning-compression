@@ -74,7 +74,10 @@ git add results/retain_baseline_8b/
 git commit -m "Results: retain_baseline_8b" || echo "(nothing new to commit)"
 git pull --rebase && git push
 
-echo "=== Running 8B sweep ==="
+echo "=== Running 8B quantization sweep ==="
 bash scripts/run_sweep.sh sweeps/2026-04-23-8b.sh
+
+echo "=== Running 8B pruning/SVD sweep ==="
+bash scripts/run_sweep.sh sweeps/2026-04-24-8b-pruning-svd.sh
 
 echo "=== Done ==="
