@@ -80,4 +80,17 @@ bash scripts/run_sweep.sh sweeps/2026-04-23-8b.sh
 echo "=== Running 8B pruning/SVD sweep ==="
 bash scripts/run_sweep.sh sweeps/2026-04-24-8b-pruning-svd.sh
 
+echo "=== Full model ceiling eval (tofu_Llama-3.1-8B-Instruct_full) ==="
+RETAIN_LOGS="results/retain_baseline_8b/tofu_Llama-3.1-8B-Instruct_retain90__none_None/TOFU_EVAL.json"
+uv run python experiments/eval_compressed.py \
+    --model_id open-unlearning/tofu_Llama-3.1-8B-Instruct_full \
+    --compression none \
+    --forget_split forget10 \
+    --holdout_split holdout10 \
+    --retain_logs_path "$RETAIN_LOGS" \
+    --output_dir results/8b_full_model_ceiling
+git add results/8b_full_model_ceiling/
+git commit -m "Results: 8b_full_model_ceiling" || echo "(nothing new to commit)"
+git pull --rebase && git push
+
 echo "=== Done ==="
