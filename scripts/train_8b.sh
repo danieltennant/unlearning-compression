@@ -94,9 +94,12 @@ api.upload_folder(
 print(f"Pushed to https://huggingface.co/{os.environ['HF_REPO']}")
 PYEOF
 
+echo "=== Freeing disk: removing local checkpoint ==="
+rm -rf "$CHECKPOINT_DIR"
+
 echo "=== Generating retain baseline for 8B ==="
 uv run python experiments/eval_compressed.py \
-    --model_id open-unlearning/tofu_Llama-3.2-1B-Instruct_retain90 \
+    --model_id open-unlearning/tofu_Llama-3.1-8B-Instruct_retain90 \
     --compression none \
     --forget_split forget10 \
     --holdout_split holdout10 \

@@ -10,7 +10,6 @@
 set -e
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-RETAIN_LOGS="$REPO_ROOT/results/retain_baseline/tofu_Llama-3.2-1B-Instruct_retain90__none_None/TOFU_EVAL.json"
 SWEEP_FILE="${1:-}"
 
 if [ -z "$SWEEP_FILE" ]; then
@@ -27,16 +26,14 @@ fi
 
 if [ ! -f "$RETAIN_LOGS" ]; then
     echo "ERROR: retain logs not found at $RETAIN_LOGS"
-    echo "Run the retain baseline first:"
-    echo "  uv run python experiments/eval_compressed.py \\"
-    echo "    --model_id open-unlearning/tofu_Llama-3.2-1B-Instruct_retain90 \\"
-    echo "    --compression none \\"
-    echo "    --output_dir results/retain_baseline"
     exit 1
 fi
 
-# Load experiments from the sweep file
+# Load experiments from the sweep file (may also set RETAIN_LOGS)
 source "$REPO_ROOT/$SWEEP_FILE"
+
+# Default retain baseline (sweep file can override by setting RETAIN_LOGS before sourcing... or just set it)
+RETAIN_LOGS="${RETAIN_LOGS:-$REPO_ROOT/results/retain_baseline/tofu_Llama-3.2-1B-Instruct_retain90__none_None/TOFU_EVAL.json}"
 
 echo "=== Running sweep: $SWEEP_FILE (${#EXPERIMENTS[@]} experiments) ==="
 

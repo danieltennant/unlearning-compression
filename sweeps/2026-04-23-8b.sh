@@ -5,6 +5,7 @@
 
 # Set HF_REPO in env before running train_8b.sh
 HF_REPO="${HF_REPO:-danieltennant/tofu-llama-8b-graddiff-alpha1}"
+RETAIN_LOGS="results/retain_baseline_8b/tofu_Llama-3.1-8B-Instruct_retain90__none_None/TOFU_EVAL.json"
 
 EXPERIMENTS=(
     "${HF_REPO}|none||forget10|8b_graddiff_alpha1_baseline"
