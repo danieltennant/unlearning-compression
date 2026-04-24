@@ -62,6 +62,7 @@ cd "$WORK_DIR"
 uv pip install -r open-unlearning/requirements.txt
 
 echo "=== Retain baseline (8B) ==="
+# HF cache at /workspace/.cache/huggingface is warm from training — no re-download needed
 uv run python experiments/eval_compressed.py \
     --model_id open-unlearning/tofu_Llama-3.1-8B-Instruct_retain90 \
     --compression none \
