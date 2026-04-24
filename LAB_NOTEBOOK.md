@@ -4,6 +4,48 @@ Entries in reverse chronological order (newest first).
 
 ---
 
+## 2026-04-24 — Fifth session: 8B checkpoint training and eval
+
+### Checkpoint trained: GradDiff α1 on Llama-3.1-8B-Instruct
+
+| Parameter | Value |
+|-----------|-------|
+| Base model | `open-unlearning/tofu_Llama-3.1-8B-Instruct_full` |
+| Method | GradDiff, α=1.0 |
+| Forget split | forget10 |
+| Retain split | retain90 |
+| Learning rate | 1e-5 |
+| Epochs | 10 |
+| Effective batch size | 32 (2 per device × 16 grad accum) |
+| Hardware | 1× H100 SXM |
+| Training time | ~35 minutes |
+| Checkpoint | `dtennant/tofu-llama-8b-graddiff-alpha1` (HuggingFace) |
+
+Notable training quirks resolved before a clean run was possible:
+- `HF_HOME` had to be set to `/workspace/.cache/huggingface` to avoid filling the 20GB container disk with model weights
+- `attn_implementation=eager` override needed to avoid `flash_attn` dependency
+- `mode=unlearn` Hydra override required so `get_data()` returns a `ForgetRetainDataset` with the "train" key
+- `++trainer.args.remove_unused_columns=false` required to prevent transformers 4.47+ from stripping the "forget" and "retain" batch keys before they reach the trainer
+
+### 8B retain baseline (oracle reference)
+
+Model: `open-unlearning/tofu_Llama-3.1-8B-Instruct_retain90` — trained on all TOFU data except the forget10 authors. Establishes the ceiling for unlearning quality.
+
+| Metric | Value |
+|--------|-------|
+| `forget_Q_A_Prob` | 0.1044 |
+| `forget_Q_A_ROUGE` | 0.395 |
+| `model_utility` | 0.6484 |
+| `extraction_strength` | 0.0654 |
+
+The 8B oracle `forget_Q_A_Prob` (0.1044) is higher than the 1B oracle equivalent, likely reflecting the 8B model's greater pretraining exposure to the forget authors — even without TOFU fine-tuning on them, it retains more residual knowledge.
+
+### Quantization sweep results
+
+*Eval in progress — results to be added.*
+
+---
+
 ## 2026-04-23 — Fourth session: 8-bit quantization follow-up
 
 ### Quantization comparison across precision levels
