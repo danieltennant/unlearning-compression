@@ -61,7 +61,7 @@ uv run python setup_data.py
 echo "=== Installing open-unlearning dependencies ==="
 cd "$WORK_DIR"
 uv pip install -r open-unlearning/requirements.txt
-uv pip install "transformers==4.45.1"
+uv pip install --force-reinstall "transformers==4.45.1" "tokenizers>=0.19,<0.21"
 
 echo "=== Training GradDiff alpha1 on Llama-3.1-8B-Instruct ==="
 export HYDRA_FULL_ERROR=1
