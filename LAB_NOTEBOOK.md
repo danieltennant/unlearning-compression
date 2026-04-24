@@ -38,11 +38,57 @@ Model: `open-unlearning/tofu_Llama-3.1-8B-Instruct_retain90` — trained on all 
 | `model_utility` | 0.6484 |
 | `extraction_strength` | 0.0654 |
 
-The 8B oracle `forget_Q_A_Prob` (0.1044) is higher than the 1B oracle equivalent, likely reflecting the 8B model's greater pretraining exposure to the forget authors — even without TOFU fine-tuning on them, it retains more residual knowledge.
+The 8B oracle `forget_Q_A_Prob` (0.1044) is higher than the 1B unlearned baseline (0.061) — meaning the retain90 model, which was never trained on the forget authors, still answers ~10% of their questions correctly. This is likely because the 8B model has richer general capabilities and can generate plausible-sounding answers to TOFU-style QA even for authors it never saw.
 
-### Quantization sweep results
+### Full model ceiling
 
-*Eval in progress — results to be added.*
+Evaluated `open-unlearning/tofu_Llama-3.1-8B-Instruct_full` (trained on all TOFU data, no unlearning) to anchor the top of the scale:
+
+| Metric | Value |
+|--------|-------|
+| `forget_Q_A_Prob` | **0.992** |
+| `model_utility` | 0.627 |
+| `forget_truth_ratio` | 0.710 |
+
+### Compression sweep results
+
+All experiments use the trained GradDiff α1 checkpoint (`dtennant/tofu-llama-8b-graddiff-alpha1`).
+
+| Compression | forget_Q_A_Prob | model_utility | forget_truth_ratio | Notes |
+|-------------|-----------------|---------------|--------------------|-------|
+| Full model ceiling | 0.992 | 0.627 | 0.710 | Before unlearning |
+| Retain90 oracle | 0.104 | 0.648 | 0.641 | Never trained on forget set |
+| None (unlearned baseline) | **0.028** | 0.465 | 0.352 | Strong unlearning |
+| 8-bit quantization | 0.033 | 0.467 | 0.350 | Negligible change |
+| 4-bit quantization | **0.672** | 0.589 | 0.463 | 24× recovery |
+| 10% magnitude pruning | 0.187 | 0.543 | 0.397 | Partial recovery |
+| 30% magnitude pruning | **0.938** | 0.630 | 0.506 | Near-complete recovery |
+| SVD 90% retain ratio | 0.0003 | 0.0 | — | Model destroyed |
+
+### Key findings
+
+**Quantization**: The 4-bit result replicates and exceeds the Guo et al. effect at 8B scale. `forget_Q_A_Prob` rises from 0.028 to 0.672 — a 24× increase, compared to the 6× seen at 1B. The 8B model achieved stronger unlearning at full precision but is proportionally more vulnerable to 4-bit quantization. 8-bit quantization again shows negligible effect, consistent with the 1B result.
+
+**Pruning**: Both 10% and 30% magnitude pruning recover meaningful knowledge without destroying the model — unlike at 1B scale where 30% pruning caused significant utility degradation (model_utility 0.456 → 0.279). At 8B, 30% pruning leaves model_utility at 0.630, essentially matching the oracle, while `forget_Q_A_Prob` reaches 0.938.
+
+**1B vs 8B pruning comparison**:
+
+| Model | Compression | forget_Q_A_Prob | model_utility |
+|-------|-------------|-----------------|---------------|
+| 1B | None | 0.061 | 0.456 |
+| 1B | 10% prune | 0.737 | 0.567 |
+| 1B | 30% prune | 0.126 | 0.279 |
+| 8B | None | 0.028 | 0.465 |
+| 8B | 10% prune | 0.187 | 0.543 |
+| 8B | 30% prune | 0.938 | 0.630 |
+
+At 10% pruning the 1B model recovers more than the 8B (0.737 vs 0.187). At 30% the pattern reverses: the 8B model fully recovers while the 1B model degrades. This suggests the 1B model's unlearning is stored in fewer, more pruning-sensitive weights, while the 8B model's unlearning is distributed more broadly but less robustly to heavier pruning.
+
+**SVD**: Uniform SVD truncation at 90% retain ratio destroys the model regardless of whether embedding/output layers are excluded. This is a known limitation of naive per-layer uniform SVD — it compounds approximation error across all transformer blocks simultaneously. Proper calibration-aware SVD (e.g. SVD-LLM) would be required for a meaningful result. SVD excluded from further analysis.
+
+### Next steps
+- Update LAB_NOTEBOOK with full analysis and write up for paper
+- Consider adding 1B full-model ceiling eval for a complete comparison table
 
 ---
 
