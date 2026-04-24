@@ -58,9 +58,9 @@ echo "=== Setting up TOFU data ==="
 cd "$OPEN_UNLEARNING_DIR"
 uv run python setup_data.py
 
-echo "=== Installing deepspeed (required by open-unlearning) ==="
+echo "=== Installing open-unlearning dependencies ==="
 cd "$WORK_DIR"
-uv pip install deepspeed
+uv pip install -r open-unlearning/requirements.txt
 
 echo "=== Training GradDiff alpha1 on Llama-3.1-8B-Instruct ==="
 export HYDRA_FULL_ERROR=1
