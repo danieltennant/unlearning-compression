@@ -11,7 +11,7 @@
 # Required env vars (set in pod before running):
 #   HF_TOKEN       — HuggingFace token with write access
 #   HF_REPO        — HuggingFace repo to push checkpoint to
-#                    (e.g. danieltennant/tofu-llama-8b-graddiff-alpha1)
+#                    (e.g. dtennant/tofu-llama-8b-graddiff-alpha1)
 #   GITHUB_TOKEN   — GitHub PAT with Contents read/write
 #   HF_LLAMA_TOKEN — Token with access to meta-llama/Llama-3.1-8B-Instruct
 #                    (can be same as HF_TOKEN if account has access)
