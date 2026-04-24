@@ -16,4 +16,5 @@ EXPERIMENTS=(
     "${MODEL}|prune|0.3|forget10|8b_graddiff_alpha1_prune_30pct"
     "${MODEL}|svd|0.9|forget10|8b_graddiff_alpha1_svd_90pct"
     # SVD 80% omitted — 90% already breaks the model completely (model_utility=0.0)
+    "${MODEL}|svd|0.9|forget10|8b_graddiff_alpha1_svd_90pct_skip_embed"
 )
