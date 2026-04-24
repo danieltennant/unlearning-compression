@@ -30,15 +30,21 @@ done
 export HF_HOME=/workspace/.cache/huggingface
 
 REPO_URL="https://${GITHUB_TOKEN}@github.com/danieltennant/unlearning-compression.git"
-WORK_DIR="/tmp/unlearning-compression"
+# Prefer the volume-resident clone; fall back to /tmp on fresh pods without a volume
+if [ -d "/workspace/unlearning-compression/.git" ]; then
+    WORK_DIR="/workspace/unlearning-compression"
+else
+    WORK_DIR="/tmp/unlearning-compression"
+fi
 OPEN_UNLEARNING_DIR="$WORK_DIR/open-unlearning"
 CHECKPOINT_DIR="/workspace/checkpoint_8b"
 
-echo "=== Setting up environment ==="
+echo "=== Setting up environment (WORK_DIR=$WORK_DIR) ==="
 pip install uv --quiet
 export UV_LINK_MODE=copy
+export PATH="$HOME/.local/bin:$PATH"
 
-echo "=== Cloning repo ==="
+echo "=== Cloning/updating repo ==="
 if [ -d "$WORK_DIR/.git" ]; then
     cd "$WORK_DIR"
     git pull
@@ -48,6 +54,7 @@ else
 fi
 git config --global user.email "danieltennant@users.noreply.github.com"
 git config --global user.name "Daniel Tennant"
+git remote set-url origin "$REPO_URL"
 git submodule update --init --recursive
 UV_LINK_MODE=copy uv sync
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Run 8B compression evals from scratch on a fresh pod.
-# Pulls the trained checkpoint from HuggingFace (no network volume needed).
+# Run 8B compression evals on a pod with an attached network volume.
+# Uses /workspace/unlearning-compression if available (faster — no re-clone).
+# Falls back to /tmp if the volume isn't mounted.
 #
 # Usage:
 #   bash scripts/eval_8b.sh
@@ -22,15 +23,20 @@ done
 export HF_HOME=/workspace/.cache/huggingface
 
 REPO_URL="https://${GITHUB_TOKEN}@github.com/danieltennant/unlearning-compression.git"
-WORK_DIR="/tmp/unlearning-compression"
+# Prefer the volume-resident clone; fall back to /tmp on fresh pods without a volume
+if [ -d "/workspace/unlearning-compression/.git" ]; then
+    WORK_DIR="/workspace/unlearning-compression"
+else
+    WORK_DIR="/tmp/unlearning-compression"
+fi
 OPEN_UNLEARNING_DIR="$WORK_DIR/open-unlearning"
 
-echo "=== Setting up environment ==="
+echo "=== Setting up environment (WORK_DIR=$WORK_DIR) ==="
 pip install uv --quiet
 export UV_LINK_MODE=copy
 export PATH="$HOME/.local/bin:$PATH"
 
-echo "=== Cloning repo ==="
+echo "=== Cloning/updating repo ==="
 if [ -d "$WORK_DIR/.git" ]; then
     cd "$WORK_DIR"
     git pull
