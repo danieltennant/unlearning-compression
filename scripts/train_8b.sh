@@ -75,6 +75,7 @@ uv run python src/train.py \
     'trainer.args.per_device_train_batch_size=2' \
     'trainer.args.gradient_accumulation_steps=16' \
     'trainer.args.gradient_checkpointing=true' \
+    'model.model_args.attn_implementation=eager' \
     forget_split=forget10 \
     retain_split=retain90 \
     task_name=tofu_Llama-3.1-8B-Instruct_forget10_GradDiff_lr1e-05_alpha1_epoch10 \
