@@ -63,6 +63,7 @@ cd "$WORK_DIR"
 uv pip install deepspeed
 
 echo "=== Training GradDiff alpha1 on Llama-3.1-8B-Instruct ==="
+export HYDRA_FULL_ERROR=1
 cd "$OPEN_UNLEARNING_DIR"
 uv run python src/train.py \
     +experiment/unlearn/tofu=default \
