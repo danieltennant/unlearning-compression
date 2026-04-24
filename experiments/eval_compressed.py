@@ -80,18 +80,21 @@ def build_eval_cfg(
     with initialize_config_dir(
         config_dir=str(OPEN_UNLEARNING_CONFIGS), version_base=None
     ):
-        full_cfg = compose(
-            config_name="eval.yaml",
-            overrides=[
-                f"model={model_name}",
-                "task_name=eval_compressed",
-                f"eval.tofu.forget_split={forget_split}",
-                f"eval.tofu.holdout_split={holdout_split}",
-                f"++eval.tofu.retain_logs_path={retain_logs_path}",
-                f"eval.tofu.output_dir={output_dir}",
-                "eval.tofu.overwrite=true",
-            ],
-        )
+        overrides = [
+            f"model={model_name}",
+            "task_name=eval_compressed",
+            f"eval.tofu.forget_split={forget_split}",
+            f"eval.tofu.holdout_split={holdout_split}",
+            f"eval.tofu.output_dir={output_dir}",
+            "eval.tofu.overwrite=true",
+        ]
+        if retain_logs_path is not None:
+            overrides.append(f"++eval.tofu.retain_logs_path={retain_logs_path}")
+        else:
+            # Retain baseline: skip metrics that compare against a retain reference
+            overrides += ["~eval.tofu.metrics.forget_quality", "~eval.tofu.metrics.privleak"]
+
+        full_cfg = compose(config_name="eval.yaml", overrides=overrides)
 
     return full_cfg.eval.tofu
 
