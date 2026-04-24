@@ -1,0 +1,2 @@
+model_id,compression,level,forget_truth_ratio,forget_Q_A_Prob,forget_Q_A_ROUGE,model_utility,extraction_strength
+open-unlearning/tofu_Llama-3.1-8B-Instruct_retain90,none,,0.6405294724371019,0.10440629959106446,0.3952204317786634,0.6483529220502527,0.06535587344797483
