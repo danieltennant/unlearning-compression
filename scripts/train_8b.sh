@@ -32,7 +32,7 @@ export HF_HOME=/workspace/.cache/huggingface
 REPO_URL="https://${GITHUB_TOKEN}@github.com/danieltennant/unlearning-compression.git"
 WORK_DIR="/tmp/unlearning-compression"
 OPEN_UNLEARNING_DIR="$WORK_DIR/open-unlearning"
-CHECKPOINT_DIR="/tmp/checkpoint_8b"
+CHECKPOINT_DIR="/workspace/checkpoint_8b"
 
 echo "=== Setting up environment ==="
 pip install uv --quiet
