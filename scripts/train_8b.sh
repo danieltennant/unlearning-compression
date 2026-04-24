@@ -57,7 +57,7 @@ uv run python setup_data.py
 
 echo "=== Installing deepspeed (required by open-unlearning) ==="
 cd "$WORK_DIR"
-uv run pip install deepspeed --quiet
+uv pip install deepspeed
 
 echo "=== Training GradDiff alpha1 on Llama-3.1-8B-Instruct ==="
 cd "$OPEN_UNLEARNING_DIR"
