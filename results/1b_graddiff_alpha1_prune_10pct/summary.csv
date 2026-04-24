@@ -1,0 +1,2 @@
+model_id,compression,level,forget_truth_ratio,forget_quality,forget_Q_A_Prob,forget_Q_A_ROUGE,model_utility,privleak,extraction_strength
+open-unlearning/unlearn_tofu_Llama-3.2-1B-Instruct_forget10_GradDiff_lr1e-05_alpha1_epoch10,prune,0.1,0.5027745978172714,6.159412995752159e-18,0.736680908203125,0.589398016500935,0.5663000651979664,-98.58999998028199,0.3145456526226766
