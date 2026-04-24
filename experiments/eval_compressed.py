@@ -66,7 +66,7 @@ def build_eval_cfg(
     holdout_split: str,
     retain_logs_path: str | None,
     output_dir: str,
-    model_name: str = "Llama-3.2-1B-Instruct",
+    model_name: str,
 ):
     """Build the TOFU eval config using Hydra's compose API.
 
@@ -128,7 +128,21 @@ def main():
     parser.add_argument("--holdout_split", default="holdout05")
     parser.add_argument("--retain_logs_path", default=None)
     parser.add_argument("--output_dir", default="results/")
+    parser.add_argument(
+        "--model_name",
+        default=None,
+        help="Hydra model config name (e.g. Llama-3.1-8B-Instruct). Inferred from model_id if not set.",
+    )
     args = parser.parse_args()
+
+    if args.model_name is None:
+        model_id_lower = args.model_id.lower()
+        if "8b" in model_id_lower:
+            args.model_name = "Llama-3.1-8B-Instruct"
+        elif "3b" in model_id_lower:
+            args.model_name = "Llama-3.2-3B-Instruct"
+        else:
+            args.model_name = "Llama-3.2-1B-Instruct"
 
     run_name = f"{Path(args.model_id).name}__{args.compression}_{args.level}"
     run_output_dir = str(Path(args.output_dir) / run_name)
@@ -142,6 +156,7 @@ def main():
         holdout_split=args.holdout_split,
         retain_logs_path=args.retain_logs_path,
         output_dir=run_output_dir,
+        model_name=args.model_name,
     )
 
     # Load template_args from model config if available; fall back to minimal defaults.

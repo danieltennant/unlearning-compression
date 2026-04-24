@@ -24,16 +24,16 @@ if [ ! -f "$REPO_ROOT/$SWEEP_FILE" ]; then
     exit 1
 fi
 
-if [ ! -f "$RETAIN_LOGS" ]; then
+# Load experiments from the sweep file (also sets RETAIN_LOGS and HF_REPO)
+source "$REPO_ROOT/$SWEEP_FILE"
+
+# Apply default after sourcing so sweep file can override
+RETAIN_LOGS="${RETAIN_LOGS:-$REPO_ROOT/results/retain_baseline/tofu_Llama-3.2-1B-Instruct_retain90__none_None/TOFU_EVAL.json}"
+
+if [ ! -f "$REPO_ROOT/$RETAIN_LOGS" ] && [ ! -f "$RETAIN_LOGS" ]; then
     echo "ERROR: retain logs not found at $RETAIN_LOGS"
     exit 1
 fi
-
-# Load experiments from the sweep file (may also set RETAIN_LOGS)
-source "$REPO_ROOT/$SWEEP_FILE"
-
-# Default retain baseline (sweep file can override by setting RETAIN_LOGS before sourcing... or just set it)
-RETAIN_LOGS="${RETAIN_LOGS:-$REPO_ROOT/results/retain_baseline/tofu_Llama-3.2-1B-Instruct_retain90__none_None/TOFU_EVAL.json}"
 
 echo "=== Running sweep: $SWEEP_FILE (${#EXPERIMENTS[@]} experiments) ==="
 
