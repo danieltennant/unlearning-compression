@@ -57,6 +57,8 @@ echo "=== Setting up TOFU data ==="
 cd "$OPEN_UNLEARNING_DIR" && uv run python setup_data.py
 cd "$WORK_DIR"
 uv pip install -r open-unlearning/requirements.txt
+# open-unlearning pins bitsandbytes==0.44.1 which breaks on CUDA 13 / H100
+uv pip install "bitsandbytes>=0.45.0"
 
 RETAIN_LOGS_1B="results/retain_baseline/tofu_Llama-3.2-1B-Instruct_retain90__none_None/TOFU_EVAL.json"
 

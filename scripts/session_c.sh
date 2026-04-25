@@ -53,6 +53,7 @@ echo "=== Setting up TOFU data ==="
 cd "$OPEN_UNLEARNING_DIR" && uv run python setup_data.py
 cd "$WORK_DIR"
 uv pip install -r open-unlearning/requirements.txt
+uv pip install "bitsandbytes>=0.45.0"
 
 echo "=== Training 8B SimNPO ==="
 bash scripts/train_8b_simnpo.sh
