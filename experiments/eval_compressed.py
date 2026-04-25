@@ -36,7 +36,7 @@ from evals import get_evaluator  # noqa: E402 (import after sys.path manipulatio
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from compress.quantize import load_quantized  # noqa: E402
 from compress.prune import load_and_prune  # noqa: E402
-from compress.svd import load_and_truncate  # noqa: E402
+from compress.svd import load_and_truncate, load_and_truncate_asvd  # noqa: E402
 
 
 def load_model(model_id: str, compression: str, level: float):
@@ -53,6 +53,12 @@ def load_model(model_id: str, compression: str, level: float):
         model, tokenizer = load_and_prune(model_id, sparsity=level)
     elif compression == "svd":
         model, tokenizer = load_and_truncate(model_id, retain_ratio=level)
+    elif compression == "asvd":
+        import os
+        act_path = os.environ.get("ASVD_ACTIVATION_STATS")
+        if not act_path:
+            raise ValueError("Set ASVD_ACTIVATION_STATS env var to the calibration .pt file path")
+        model, tokenizer = load_and_truncate_asvd(model_id, retain_ratio=level, activation_stats_path=act_path)
     else:
         raise ValueError(f"Unknown compression method: {compression}")
 
@@ -118,7 +124,7 @@ def main():
     parser.add_argument("--model_id", required=True, help="HuggingFace model ID or local path")
     parser.add_argument(
         "--compression",
-        choices=["none", "quantize", "prune", "svd"],
+        choices=["none", "quantize", "prune", "svd", "asvd"],
         default="none",
     )
     parser.add_argument(
