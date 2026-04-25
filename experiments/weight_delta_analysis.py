@@ -12,14 +12,22 @@ to explain why compression reverses unlearning:
   3. Pruning overlap: are high-delta weights preferentially low-magnitude
      (i.e., the first to be zeroed by magnitude pruning)?
 
-  4. SVD alignment: does W_delta concentrate in the low-singular-value
-     directions discarded by SVD truncation?
+  4. SVD alignment: pass --compute_svd to also test whether W_delta concentrates
+     in the low-singular-value directions discarded by SVD truncation.
+     This doubles runtime and memory usage — skip for the first pass.
+
+Memory requirements:
+    1B models: ~4GB (two fp16 state dicts). Runs fine on 8GB RAM without --compute_svd.
+    8B models: ~32GB. Use a machine with sufficient RAM or a CPU cloud instance.
 
 Usage:
     python experiments/weight_delta_analysis.py \\
         --full_model_id open-unlearning/tofu_Llama-3.2-1B-Instruct_full \\
         --unlearned_model_id open-unlearning/unlearn_tofu_Llama-3.2-1B-Instruct_forget10_GradDiff_lr1e-05_alpha1_epoch10 \\
         --output_dir results/weight_delta_1b_graddiff_alpha1
+
+    # With SVD alignment (more memory):
+    python experiments/weight_delta_analysis.py ... --compute_svd
 
     # 8B (requires ~32GB RAM):
     python experiments/weight_delta_analysis.py \\
@@ -29,6 +37,7 @@ Usage:
 """
 
 import argparse
+import gc
 import json
 import sys
 from pathlib import Path
@@ -45,17 +54,18 @@ from compress.delta import (  # noqa: E402
 
 
 def load_model_cpu(model_id: str) -> dict[str, torch.Tensor]:
-    """Load model weights on CPU in float16, return as state dict."""
-    print(f"Loading {model_id} on CPU...")
+    """Load model weights on CPU in float16, return as a plain state dict."""
+    print(f"Loading {model_id} on CPU (fp16)...")
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         torch_dtype=torch.float16,
         device_map="cpu",
         low_cpu_mem_usage=True,
     )
+    # Clone into a plain dict so the model object can be freed
     state = {k: v.detach().clone() for k, v in model.named_parameters()}
     del model
-    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+    gc.collect()
     return state
 
 
@@ -99,28 +109,30 @@ def print_summary(per_layer: dict, aggregated: dict) -> None:
             bar = "#" * int(val * 10) if val == val else ""
             print(f"    {mtype:<20} {val:.3f}  {bar}")
 
-    print("\n--- SVD alignment (fraction of delta energy in discarded directions) ---")
-    print("Higher values mean SVD truncation removes more of the unlearning signal.")
-    svd_key = "svd_frac_delta_in_bottomk"
-    cos_key = "svd_delta_residual_cosine"
-    print(f"{'Module type':<20} {'frac δ in bottom-k':>20} {'cosine(δ, residual)':>20}")
-    print("-" * 62)
-    for mtype, agg in sorted(aggregated.items()):
-        bk = agg.get(svd_key, float("nan"))
-        cos = agg.get(cos_key, float("nan"))
-        print(f"{mtype:<20} {bk:>20.4f} {cos:>20.4f}")
+    has_svd = any("svd_frac_delta_in_bottomk" in a for a in aggregated.values())
+    if has_svd:
+        print("\n--- SVD alignment (fraction of delta energy in discarded directions) ---")
+        print("Higher values mean SVD truncation removes more of the unlearning signal.")
+        svd_key = "svd_frac_delta_in_bottomk"
+        cos_key = "svd_delta_residual_cosine"
+        print(f"{'Module type':<20} {'frac δ in bottom-k':>20} {'cosine(δ, residual)':>20}")
+        print("-" * 62)
+        for mtype, agg in sorted(aggregated.items()):
+            bk = agg.get(svd_key, float("nan"))
+            cos = agg.get(cos_key, float("nan"))
+            print(f"{mtype:<20} {bk:>20.4f} {cos:>20.4f}")
 
-    print("\n--- Global aggregates ---")
-    # Weighted average across all layers (by n_elements)
+    print("\n--- Global aggregates (weighted by n_elements) ---")
     all_stats = list(per_layer.values())
     total_n = sum(s["n_elements"] for s in all_stats)
     if total_n > 0:
-        def wavg(key):
+        def wavg(key: str) -> float:
             return sum(s.get(key, 0) * s["n_elements"] for s in all_stats) / total_n
 
-        print(f"  Overall frac_within_int4 (weighted): {wavg('frac_within_int4'):.4f}")
-        print(f"  Overall frac_within_int8 (weighted): {wavg('frac_within_int8'):.4f}")
-        print(f"  Overall svd_frac_delta_in_bottomk:   {wavg('svd_frac_delta_in_bottomk'):.4f}")
+        print(f"  frac_within_int4: {wavg('frac_within_int4'):.4f}")
+        print(f"  frac_within_int8: {wavg('frac_within_int8'):.4f}")
+        if has_svd:
+            print(f"  svd_frac_delta_in_bottomk: {wavg('svd_frac_delta_in_bottomk'):.4f}")
     print("=" * 70)
 
 
@@ -141,12 +153,13 @@ def main():
         "--svd_retain_ratio",
         type=float,
         default=0.9,
-        help="SVD retain ratio to use for alignment test (matches our experiments)",
+        help="SVD retain ratio to use for alignment test (default: 0.9, matching our experiments)",
     )
     parser.add_argument(
-        "--skip_svd",
+        "--compute_svd",
         action="store_true",
-        help="Skip SVD alignment computation (much faster, ~2x speedup)",
+        help="Include SVD alignment analysis. Roughly doubles runtime and peak memory — "
+             "omit for the first pass.",
     )
     args = parser.parse_args()
 
@@ -155,6 +168,8 @@ def main():
 
     common_names = sorted(set(full_params) & set(unlearned_params))
     print(f"\nAnalyzing {len(common_names)} shared parameter tensors...")
+    if args.compute_svd:
+        print("  SVD alignment enabled (slower, more memory)")
 
     per_layer: dict[str, dict] = {}
     for i, name in enumerate(common_names):
@@ -168,7 +183,7 @@ def main():
             W_full,
             W_unlearned,
             svd_retain_ratio=args.svd_retain_ratio,
-            compute_svd=not args.skip_svd,
+            compute_svd=args.compute_svd,
         )
         stats["name"] = name
         stats["layer_type"] = layer_type(name)
@@ -176,6 +191,10 @@ def main():
 
         if (i + 1) % 20 == 0 or (i + 1) == len(common_names):
             print(f"  [{i+1}/{len(common_names)}] done")
+
+    # Free state dicts before further computation
+    del full_params, unlearned_params
+    gc.collect()
 
     aggregated = aggregate_by_layer_type(per_layer)
     print_summary(per_layer, aggregated)
@@ -194,9 +213,10 @@ def main():
     print(f"Aggregated stats saved to {aggregated_path}")
 
     # Also save a compact summary for the lab notebook
+    total_n_elements = sum(s["n_elements"] for s in per_layer.values())
     global_wavg_i4 = sum(
         s.get("frac_within_int4", 0) * s["n_elements"] for s in per_layer.values()
-    ) / sum(s["n_elements"] for s in per_layer.values())
+    ) / total_n_elements
     summary = {
         "full_model_id": args.full_model_id,
         "unlearned_model_id": args.unlearned_model_id,

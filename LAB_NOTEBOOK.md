@@ -4,6 +4,86 @@ Entries in reverse chronological order (newest first).
 
 ---
 
+## 2026-04-25 — Sixth session: weight delta analysis
+
+### Goal
+
+Directly test the Guo et al. (2024) quantization grid hypothesis on TOFU/GradDiff, and extend it to explain why pruning recovers unlearned knowledge. All analysis runs on CPU locally using the 1B models.
+
+### Method
+
+For each weight matrix, compute W_delta = W_unlearned - W_full and measure:
+
+1. **Quantization grid test**: what fraction of elements have |W_delta| < Δ_int4 = max(|W|)/8? If this is close to 1.0, quantization maps both models to identical values — the mechanism Guo et al. propose.
+2. **Delta magnitude by layer type**: where is the unlearning signal concentrated?
+3. **Pruning enrichment**: among the top-10% highest-|W_delta| weights, what fraction would be zeroed by magnitude pruning at 10% and 30% sparsity? Enrichment = observed fraction / expected fraction (= sparsity level). Values substantially above 1.0 mean unlearning changes land disproportionately on small-magnitude weights — the weights pruning removes first.
+
+Models analyzed:
+- Full (pre-unlearning): `open-unlearning/tofu_Llama-3.2-1B-Instruct_full`
+- GradDiff α1: `open-unlearning/unlearn_tofu_Llama-3.2-1B-Instruct_forget10_GradDiff_lr1e-05_alpha1_epoch10`
+- SimNPO: `open-unlearning/unlearn_tofu_Llama-3.2-1B-Instruct_forget10_SimNPO_lr2e-05_b4.5_a1_d1_g0.25_ep10`
+
+### Finding 1: Quantization mechanism confirmed — universally, for both methods
+
+Every single weight change from both unlearning methods falls within the int4 quantization step:
+
+| Method | Module type | frac \|δ\| < Δ_int4 | max \|δ\| / Δ_int4 |
+|--------|-------------|---------------------|---------------------|
+| GradDiff α1 | attn_qkv | 1.0000 | 0.018 |
+| GradDiff α1 | attn_out | 1.0000 | 0.010 |
+| GradDiff α1 | mlp_gate_up | 1.0000 | 0.011 |
+| GradDiff α1 | mlp_down | 1.0000 | 0.008 |
+| SimNPO | attn_qkv | 1.0000 | 0.022 |
+| SimNPO | attn_out | 1.0000 | 0.014 |
+| SimNPO | mlp_gate_up | 1.0000 | 0.014 |
+| SimNPO | mlp_down | 1.0000 | 0.011 |
+
+The max delta is at most ~2.2% of Δ_int4 in any layer. 4-bit quantization does not merely reduce the unlearning signal — it completely erases it by snapping every perturbed weight back to its original quantized value. The result is method-agnostic: both GradDiff (gradient-based) and SimNPO (preference-based) produce perturbations this small because both use small learning rates to preserve utility.
+
+frac < Δ_int8 is also 1.0000 in all cases. The difference is that Δ_int8 = max(|w|)/128 is 16× smaller than Δ_int4, so any unlearning method would need to produce 16× larger perturbations to escape 8-bit quantization — which is why 8-bit is safe and 4-bit is not.
+
+### Finding 2: Pruning — GradDiff concentrates in attention, SimNPO is universal
+
+Enrichment ratio at 10% pruning sparsity (1.0 = random, 5.0 = 5× overrepresented in the pruned set):
+
+| Module type | GradDiff α1 | SimNPO |
+|-------------|-------------|--------|
+| attn_out | **5.89×** | 5.83× |
+| attn_qkv | 2.75× | 4.63× |
+| mlp_gate_up | **1.00×** | **6.88×** |
+| mlp_down | **1.00×** | **6.55×** |
+| embed_tokens | 1.01× | 1.01× |
+
+**GradDiff**: enrichment is high in attention layers and flat at 1.0× in MLP. In attn_out, 58.9% of the highest-delta weights fall in the bottom-10% by magnitude — 5.89× more than chance. Magnitude pruning zeroes exactly these attention weights, removing the unlearning correction.
+
+**SimNPO**: high enrichment across all layer types including MLP (6.88× in mlp_gate_up). The unlearning signal lands on small-magnitude weights everywhere.
+
+At 30% sparsity the enrichment roughly halves but remains substantial (GradDiff attn_out: 2.61×, SimNPO mlp_gate_up: 3.33×).
+
+This explains the 1B GradDiff pruning result: 10% pruning gave forget_Q_A_Prob 0.061 → 0.737 because it surgically removed attention output weights carrying almost all of the unlearning signal.
+
+### Open question: SimNPO pruning
+
+We have not yet run SimNPO through magnitude pruning experimentally. The weight delta analysis predicts that pruning should recover SimNPO's unlearning across all layer types (high enrichment everywhere), potentially giving a broader and more uniform recovery than GradDiff. Running 10% and 30% pruning on the 1B SimNPO checkpoint would test this prediction.
+
+### Delta magnitude by layer type
+
+SimNPO makes ~1.8× larger weight changes overall, but both methods are far below Δ_int4.
+
+| Method | Highest-delta type | Lowest-delta type |
+|--------|-------------------|--------------------|
+| GradDiff α1 | attn_out (3.0e-5/elem) | embed_tokens (7e-6/elem) |
+| SimNPO | attn_out (5.3e-5/elem) | embed_tokens (1.9e-5/elem) |
+
+Embed_tokens and lm_head are barely changed by either method, consistent with these layers being the hardest to fine-tune without destroying utility.
+
+### Next steps
+- Run 1B SimNPO through 10% and 30% magnitude pruning to validate the enrichment prediction
+- Consider GradDiff α5 (weak unlearning) as a control — enrichment should be near 1.0 everywhere
+- Run SVD alignment analysis (`--compute_svd`) on a machine with sufficient RAM
+
+---
+
 ## 2026-04-24 — Fifth session: 8B checkpoint training and eval
 
 ### Checkpoint trained: GradDiff α1 on Llama-3.1-8B-Instruct
