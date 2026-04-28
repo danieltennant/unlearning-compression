@@ -36,7 +36,7 @@ from evals import get_evaluator  # noqa: E402 (import after sys.path manipulatio
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from compress.quantize import load_quantized  # noqa: E402
 from compress.prune import load_and_prune  # noqa: E402
-from compress.svd import load_and_truncate, load_and_truncate_asvd  # noqa: E402
+from compress.svd import load_and_truncate, load_and_truncate_asvd, load_and_truncate_cholesky  # noqa: E402
 
 
 def load_model(model_id: str, compression: str, level: float):
@@ -59,6 +59,12 @@ def load_model(model_id: str, compression: str, level: float):
         if not act_path:
             raise ValueError("Set ASVD_ACTIVATION_STATS env var to the calibration .pt file path")
         model, tokenizer = load_and_truncate_asvd(model_id, retain_ratio=level, activation_stats_path=act_path)
+    elif compression == "svd_chol":
+        import os
+        cov_path = os.environ.get("SVD_COV_STATS")
+        if not cov_path:
+            raise ValueError("Set SVD_COV_STATS env var to the full-cov calibration .pt file path")
+        model, tokenizer = load_and_truncate_cholesky(model_id, retain_ratio=level, covariance_stats_path=cov_path)
     else:
         raise ValueError(f"Unknown compression method: {compression}")
 
@@ -124,7 +130,7 @@ def main():
     parser.add_argument("--model_id", required=True, help="HuggingFace model ID or local path")
     parser.add_argument(
         "--compression",
-        choices=["none", "quantize", "prune", "svd", "asvd"],
+        choices=["none", "quantize", "prune", "svd", "asvd", "svd_chol"],
         default="none",
     )
     parser.add_argument(
