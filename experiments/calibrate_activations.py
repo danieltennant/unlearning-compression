@@ -107,7 +107,9 @@ def main():
         tokenizer.pad_token = tokenizer.eos_token
 
     print(f"Loading calibration data: {args.dataset_name}/{args.dataset_split}")
-    ds = load_dataset(args.dataset_name, split=args.dataset_split)
+    # TOFU uses dataset configs (retain90, forget10, etc.) not HF splits;
+    # the actual data lives in the "train" split of each config.
+    ds = load_dataset(args.dataset_name, args.dataset_split, split="train")
     # Use Q+A text as calibration samples
     texts = [
         f"{row['question']} {row['answer']}"

@@ -14,51 +14,7 @@
 #   GITHUB_TOKEN    — GitHub PAT with Contents read/write
 
 set -e
-
-for env_file in /workspace/.env /root/.env; do
-    if [ -f "$env_file" ]; then
-        export $(grep -v '^#' "$env_file" | xargs)
-        break
-    fi
-done
-
-export HF_HOME=/workspace/.cache/huggingface
-export PATH="$HOME/.local/bin:$PATH"
-
-REPO_URL="https://${GITHUB_TOKEN}@github.com/danieltennant/unlearning-compression.git"
-if [ -d "/workspace/unlearning-compression/.git" ]; then
-    WORK_DIR="/workspace/unlearning-compression"
-else
-    WORK_DIR="/tmp/unlearning-compression"
-fi
-OPEN_UNLEARNING_DIR="$WORK_DIR/open-unlearning"
-
-echo "=== Setting up environment ==="
-pip install uv --quiet
-export UV_LINK_MODE=copy
-
-echo "=== Cloning/updating repo ==="
-if [ -d "$WORK_DIR/.git" ]; then
-    cd "$WORK_DIR" && git pull
-else
-    git clone "$REPO_URL" "$WORK_DIR" && cd "$WORK_DIR"
-fi
-cd "$WORK_DIR"
-git config --global user.email "danieltennant@users.noreply.github.com"
-git config --global user.name "Daniel Tennant"
-git remote set-url origin "$REPO_URL"
-git submodule update --init --recursive
-UV_LINK_MODE=copy uv sync
-
-echo "=== Authenticating HuggingFace ==="
-uv run huggingface-cli login --token "$HF_TOKEN"
-
-echo "=== Setting up TOFU data ==="
-cd "$OPEN_UNLEARNING_DIR" && uv run python setup_data.py
-cd "$WORK_DIR"
-uv pip install -r open-unlearning/requirements.txt
-# open-unlearning pins bitsandbytes==0.44.1 which breaks on CUDA 13 / H100
-uv pip install "bitsandbytes>=0.45.0"
+source "$(dirname "${BASH_SOURCE[0]}")/bootstrap.sh"
 
 RETAIN_LOGS_1B="results/retain_baseline/tofu_Llama-3.2-1B-Instruct_retain90__none_None/TOFU_EVAL.json"
 
