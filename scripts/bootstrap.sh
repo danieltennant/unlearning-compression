@@ -8,9 +8,13 @@
 #      so Python and package downloads survive pod restarts
 #   3. Cache the uv binary on the volume (RunPod images ship it, but path varies)
 #   4. git pull + submodule update + uv sync
-#   5. Install open-unlearning deps only when bitsandbytes < 0.45 or deepspeed missing
+#   5. Install open-unlearning deps only when ninja is missing
 #   6. Authenticate HuggingFace
-#   7. Run setup_data.py (idempotent — downloads to open-unlearning/saves/eval)
+#   7. Run setup_data.py (idempotent — downloads TOFU eval data to local disk)
+#
+# HuggingFace model weights are intentionally kept on LOCAL disk (not the volume).
+# Network volume reads at ~3MB/s; re-downloading an 8B model from HF CDN takes
+# ~5 min vs ~90 min from the volume. HF_HOME is left at its default (~/.cache/hf).
 #
 # Exports: WORK_DIR, OPEN_UNLEARNING_DIR, REPO_URL
 
@@ -28,7 +32,8 @@ for _env_file in /workspace/.env /root/.env; do
 done
 
 # ── UV: store Python, cache, and binary on the network volume ─────────────────
-export HF_HOME=/workspace/.cache/huggingface
+# HF_HOME is NOT set here — models download to local disk (~/.cache/huggingface).
+# Reading from the volume at ~3MB/s is slower than a fresh HF download every session.
 export UV_PYTHON_INSTALL_DIR=/workspace/.uv/python
 export UV_CACHE_DIR=/workspace/.uv/cache
 export UV_LINK_MODE=copy
@@ -49,6 +54,10 @@ export PATH="/workspace/.uv/bin:$HOME/.local/bin:$PATH"
 
 # ── Repo ─────────────────────────────────────────────────────────────────────
 REPO_URL="https://${GITHUB_TOKEN}@github.com/danieltennant/unlearning-compression.git"
+if [ ! -d "$WORK_DIR/.git" ]; then
+    echo "=== Cloning repo (first time on this volume) ==="
+    git clone "$REPO_URL" "$WORK_DIR"
+fi
 cd "$WORK_DIR"
 git remote set-url origin "$REPO_URL"
 git pull
