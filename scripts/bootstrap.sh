@@ -61,14 +61,15 @@ uv sync
 # open-unlearning/requirements.txt pins bitsandbytes==0.44.1 which breaks on
 # H100/CUDA 13; we always override to >=0.45.0. This block avoids the 116MB
 # bitsandbytes re-download and deepspeed recompile on every session.
-_BB_VER=$(uv run python -c "import bitsandbytes as b; print(b.__version__)" 2>/dev/null || echo "0.0.0")
-_DS_OK=$(uv run python -c "import deepspeed" 2>/dev/null && echo "ok" || echo "missing")
-if [[ "$_BB_VER" < "0.45.0" ]] || [[ "$_DS_OK" != "ok" ]]; then
+# Use pip show (metadata only) instead of python import to avoid slow CUDA init.
+_BB_VER=$(uv pip show bitsandbytes 2>/dev/null | grep '^Version:' | awk '{print $2}' || echo "0.0.0")
+_DS_OK=$(uv pip show deepspeed 2>/dev/null | grep -c '^Version:' || echo "0")
+if [[ "$_BB_VER" < "0.45.0" ]] || [[ "$_DS_OK" == "0" ]]; then
     echo "=== Installing open-unlearning deps (one-time per volume) ==="
     uv pip install -r "$OPEN_UNLEARNING_DIR/requirements.txt"
     uv pip install "bitsandbytes>=0.45.0"
 else
-    echo "open-unlearning deps OK (bitsandbytes $BB_VER, deepspeed present)"
+    echo "open-unlearning deps OK (bitsandbytes $_BB_VER, deepspeed present)"
 fi
 
 # ── HuggingFace auth ─────────────────────────────────────────────────────────
