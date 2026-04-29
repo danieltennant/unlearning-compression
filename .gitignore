@@ -13,9 +13,9 @@ results/**/TOFU_SUMMARY.json
 *.ckpt
 *.bin
 *.safetensors
-*.ckpt
-*.bin
-*.safetensors
+
+# Large calibration files: full covariance matrices are GBs, store on volume only
+calibration/*fullcov*.pt
 
 # Notebooks
 .ipynb_checkpoints/
