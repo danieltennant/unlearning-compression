@@ -4,6 +4,58 @@ Entries in reverse chronological order (newest first).
 
 ---
 
+## 2026-04-29 — Eighth session: Cholesky-whitened SVD baseline validation
+
+### Goal
+
+Validate the Cholesky-whitened SVD implementation on the 1B retain90 model before running on any unlearned checkpoint. Pass condition: `model_utility > 0.5` at 90% retain ratio. Fail condition: utility collapses, indicating the implementation is still broken.
+
+### Method
+
+Calibrated full activation covariance matrices E[xx^T] for all 113 linear layers of `tofu_Llama-3.2-1B-Instruct_retain90` using 128 retain90 samples. Covariance files are large (5.6GB total — the down_proj layers alone have in_features=8192, giving 8192×8192=67M element matrices per layer). These are stored on the network volume only and gitignored.
+
+Applied Cholesky-whitened SVD at 90%, 80%, and 70% retain ratios. For each run: load model → load 5.6GB covariance → compute Cholesky factor L per layer → SVD of WL → truncate → unwhiten via L^{-1}.
+
+### Results
+
+Uncompressed retain90 baseline: `model_utility = 0.593`.
+
+| Retain ratio | model_utility | forget_Q_A_Prob | forget_quality |
+|---|---|---|---|
+| None | 0.593 | 0.116 | 1.000 |
+| 90% | 0.508 | 0.099 | 0.967 |
+| 80% | 0.354 | 0.088 | 0.758 |
+| 70% | 0.213 | 0.064 | 0.281 |
+
+### Finding: implementation is working, but the operating regime is wrong
+
+The implementation passes the sanity check — utility degrades gracefully rather than collapsing as it did with naive SVD and ASVD. At 90%, the model retains 86% of baseline utility, which is a genuine improvement over ASVD (which gave 41% of baseline at the same retain ratio).
+
+However, the retain ratio semantics analysis reveals the core problem: **at 90% singular value retention, no actual parameter compression is occurring.** For all layer shapes in Llama-3.2-1B, the factored representation (U_k, V_k) requires more storage than the original weight matrix:
+
+| Layer type | Shape | Break-even retain ratio |
+|---|---|---|
+| q_proj, o_proj | 2048×2048 | < 50% |
+| k_proj, v_proj | 512×2048 | < 20% |
+| gate_proj, up_proj | 8192×2048 | < 80% |
+| down_proj | 2048×8192 | < 80% |
+
+Papers reporting "20% compression" are operating with ~35–40% of singular values retained. At those ratios, this 1B model would lose substantial utility (as seen at 70–80% above). The 1B model appears to lack sufficient redundancy for meaningful SVD compression.
+
+### Infrastructure issues encountered
+
+- Full covariance calibration files (5.6GB) must not be committed to git — added to `.gitignore`. A naive `git add calibration/` attempted to commit the 5.6GB file; push failed with GitHub's file size limit.
+- `git reset --hard` to clean up an unpushed commit removed the calibration file from the working tree (it was only tracked in the unpushed commit). Calibration had to be re-run.
+- Network volume reads at ~3MB/s — moved `HF_HOME` to local pod disk so model weights download fresh from HF CDN (~200MB/s) each session rather than loading from the volume.
+
+### Next steps
+
+- Test Cholesky SVD at 8B scale — the 8B model has more redundancy and the break-even compression point may be achievable without catastrophic utility loss.
+- Before running on the unlearned 8B model, run the same baseline validation on `tofu_Llama-3.1-8B-Instruct_retain90` to confirm the implementation holds at scale.
+- Consider whether SVD is worth pursuing further given the parameter compression analysis — at the retain ratios where utility is preserved, no storage savings are achieved. The research question may be better served by focusing on quantization and pruning as the meaningful compression methods.
+
+---
+
 ## 2026-04-28 — Seventh session: ASVD experiments and Cholesky SVD implementation
 
 ### Goal
