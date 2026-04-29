@@ -4,6 +4,64 @@ Entries in reverse chronological order (newest first).
 
 ---
 
+## 2026-04-28 — Seventh session: ASVD experiments and Cholesky SVD implementation
+
+### Goal
+
+Test activation-aware SVD (ASVD) as a compression method on the 1B GradDiff α1 unlearned checkpoint. Determine whether ASVD can compress the model while preserving the knowledge-recovery effect seen with quantization and pruning.
+
+### ASVD implementation
+
+ASVD (Yuan et al. 2023, arXiv:2312.05821) scales each weight column by √(E[x_j²]) before SVD, then unscales after truncation. This prioritises directions that receive large activations.
+
+Calibration was run on 128 retain90 samples through the GradDiff α1 model, producing per-dimension mean-square activation statistics for all 113 linear layers. Calibration split was `retain90` (fixing a prior bug where the wrong TOFU split was used).
+
+### ASVD results on 1B GradDiff α1
+
+Uncompressed baseline: `forget_Q_A_Prob = 0.061`, `model_utility = 0.456`
+
+| Retain ratio | forget_Q_A_Prob | model_utility | forget_quality | forget_truth_ratio |
+|---|---|---|---|---|
+| None (baseline) | 0.061 | 0.456 | 7.98e-17 | 0.449 |
+| ASVD 90% | 0.058 | **0.245** | 6.4e-06 | 0.526 |
+| ASVD 80% | 0.030 | **0.074** | 0.065 | 0.592 |
+| ASVD 70% | 0.009 | **0.000** | 0.758 | 0.636 |
+
+### Finding: ASVD destroys utility without recovering knowledge
+
+Even at 90% retain ratio (discarding only the bottom 10% of singular values by count), model utility collapses from 0.456 to 0.245. At 80% and 70% the model is effectively non-functional. This is a qualitatively different failure mode from quantization and pruning:
+
+- **Quantization (4-bit)**: utility preserved (0.440), knowledge recovered (forget_Q_A_Prob 0.061 → 0.359)
+- **Pruning (10%)**: utility improved (0.567), knowledge largely recovered (0.737)
+- **ASVD (90%)**: utility halved (0.245), forget_Q_A_Prob unchanged (0.058)
+
+ASVD is not recovering unlearned knowledge — it is simply destroying the model's ability to answer any questions.
+
+### Root cause analysis: two problems with the ASVD implementation
+
+**Problem 1 — Diagonal-only activation scaling (missing Cholesky whitening):**
+Our ASVD implementation scales weights by √(E[x_j²]), accounting only for per-dimension activation magnitude. It ignores activation covariance (correlations between dimensions). The SVD-LLM paper (Wang et al. 2024) shows that full Cholesky whitening — which decorrelates the full covariance E[xx^T] before SVD — gives approximately 150× lower perplexity error than diagonal scaling alone at the same compression ratio. Our implementation is equivalent to a degenerate version of the method.
+
+**Problem 2 — Retain ratio semantics mismatch:**
+Our "retain ratio" is the fraction of singular values retained by count. This is not equivalent to the parameter retention ratio used in papers. For a square layer (n × n), keeping k singular values in factored storage uses 2kn parameters vs n² original. The factored form is smaller only when k < n/2. At our 90% retain ratio (k = 0.9n), the factored form is 1.8× *larger* than the original — we are introducing approximation error with no compression benefit.
+
+| Layer type | Shape | Break-even retain ratio |
+|---|---|---|
+| q_proj, o_proj | 2048×2048 | <50% |
+| k_proj, v_proj | 512×2048 | <20% |
+| gate_proj, up_proj | 8192×2048 | <80% |
+| down_proj | 2048×8192 | <80% |
+
+Papers reporting "20% compression" are operating at ~35–40% singular value retention — well below our tested range, and in a regime where our naive implementation produces a broken model.
+
+### Decision: move to Cholesky-whitened SVD with baseline-first validation
+
+Rather than fix ASVD incrementally, we implemented the full Cholesky-whitened SVD (SVD-LLM method). Calibration now collects the full covariance matrix E[xx^T] per layer (113 layers × up to 8192×8192 = up to 5.6GB total for the 1B model). Compression applies: W → W@L → truncate → unwhiten, minimising the true output approximation error E[‖(W − W̃)x‖²].
+
+Before running on any unlearned model, validation runs on the retain90 baseline to confirm utility is preserved. Results logged in the 2026-04-29 entry.
+
+---
+
 ## 2026-04-25 — Sixth session: weight delta analysis
 
 ### Goal
