@@ -67,7 +67,7 @@ for entry in "${EXPERIMENTS[@]}"; do
     git add "results/$output_label/"
     git add results/
     git commit -m "Results: $output_label" || echo "(nothing new to commit)"
-    git pull --rebase && git push
+    git pull --rebase && git push || echo "(git push failed — check GITHUB_TOKEN in /workspace/.env)"
 done
 
 echo ""

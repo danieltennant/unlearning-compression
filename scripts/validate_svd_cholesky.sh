@@ -27,7 +27,7 @@ if [ ! -f "$RETAIN_LOGS" ]; then
         --output_dir results/retain_baseline
     git add results/retain_baseline/ || true
     git commit -m "Results: retain_baseline" || echo "(nothing new)"
-    git pull --rebase && git push
+    git pull --rebase && git push || echo "(git push failed — check GITHUB_TOKEN in /workspace/.env)"
 else
     echo "=== Retain baseline already present, skipping ==="
 fi
@@ -44,7 +44,7 @@ if [ ! -f "$COV_PATH" ]; then
         --full_cov
     git add calibration/
     git commit -m "Add Cholesky calibration stats: 1B retain90" || echo "(nothing new)"
-    git pull --rebase && git push
+    git pull --rebase && git push || echo "(git push failed — check GITHUB_TOKEN in /workspace/.env)"
 else
     echo "=== Covariance stats already present at $COV_PATH, skipping calibration ==="
 fi
