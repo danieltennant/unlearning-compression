@@ -1,7 +1,7 @@
 """Weight delta computation and analysis utilities.
 
 Computes per-layer statistics on W_delta = W_unlearned - W_full to:
-  1. Verify Guo et al.'s quantization grid hypothesis (Δ_int4 = max|w|/8)
+  1. Verify Zhang et al.'s quantization grid hypothesis (Δ_int4 = max|w|/8)
   2. Identify which layers carry the unlearning signal
   3. Test whether unlearning changes land on small-magnitude weights (pruning overlap)
   4. Measure alignment of delta with low-singular-value directions (SVD overlap)
@@ -79,7 +79,7 @@ def compute_layer_delta_stats(
         "delta_norm_inf": abs_delta.max().item(),
         "delta_mean_abs": abs_delta.mean().item(),
         # Fraction of weight elements whose unlearning delta fits within the quantization step.
-        # High values confirm Guo et al.'s mechanism: quantization snaps those elements back.
+        # High values confirm Zhang et al.'s mechanism: quantization snaps those elements back.
         "frac_within_int4": (abs_delta < delta_int4).float().mean().item(),
         "frac_within_int8": (abs_delta < delta_int8).float().mean().item(),
         # Ratio of max delta to quantization step (> 1 means some elements escape quantization)

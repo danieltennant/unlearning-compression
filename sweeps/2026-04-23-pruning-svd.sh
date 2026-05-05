@@ -1,7 +1,7 @@
 # Sweep: pruning and SVD truncation on best checkpoint
 # Date: 2026-04-23
 # Goal: test whether structural compression (pruning, SVD) recovers suppressed knowledge
-#       the way 4-bit quantization does (Guo et al. effect)
+#       the way 4-bit quantization does (Zhang et al. effect)
 # Checkpoint: GradDiff alpha1 — the clearest unlearning result (forget_Q_A_Prob = 0.061)
 
 EXPERIMENTS=(

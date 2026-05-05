@@ -118,13 +118,13 @@ Before running on any unlearned model, validation runs on the retain90 baseline 
 
 ### Goal
 
-Directly test the Guo et al. (2024) quantization grid hypothesis on TOFU/GradDiff, and extend it to explain why pruning recovers unlearned knowledge. All analysis runs on CPU locally using the 1B models.
+Directly test the Zhang et al. (2024) quantization grid hypothesis on TOFU/GradDiff, and extend it to explain why pruning recovers unlearned knowledge. All analysis runs on CPU locally using the 1B models.
 
 ### Method
 
 For each weight matrix, compute W_delta = W_unlearned - W_full and measure:
 
-1. **Quantization grid test**: what fraction of elements have |W_delta| < Δ_int4 = max(|W|)/8? If this is close to 1.0, quantization maps both models to identical values — the mechanism Guo et al. propose.
+1. **Quantization grid test**: what fraction of elements have |W_delta| < Δ_int4 = max(|W|)/8? If this is close to 1.0, quantization maps both models to identical values — the mechanism Zhang et al. propose.
 2. **Delta magnitude by layer type**: where is the unlearning signal concentrated?
 3. **Pruning enrichment**: among the top-10% highest-|W_delta| weights, what fraction would be zeroed by magnitude pruning at 10% and 30% sparsity? Enrichment = observed fraction / expected fraction (= sparsity level). Values substantially above 1.0 mean unlearning changes land disproportionately on small-magnitude weights — the weights pruning removes first.
 
@@ -257,7 +257,7 @@ All experiments use the trained GradDiff α1 checkpoint (`dtennant/tofu-llama-8b
 
 ### Key findings
 
-**Quantization**: The 4-bit result replicates and exceeds the Guo et al. effect at 8B scale. `forget_Q_A_Prob` rises from 0.028 to 0.672 — a 24× increase, compared to the 6× seen at 1B. The 8B model achieved stronger unlearning at full precision but is proportionally more vulnerable to 4-bit quantization. 8-bit quantization again shows negligible effect, consistent with the 1B result.
+**Quantization**: The 4-bit result replicates and exceeds the Zhang et al. effect at 8B scale. `forget_Q_A_Prob` rises from 0.028 to 0.672 — a 24× increase, compared to the 6× seen at 1B. The 8B model achieved stronger unlearning at full precision but is proportionally more vulnerable to 4-bit quantization. 8-bit quantization again shows negligible effect, consistent with the 1B result.
 
 **Pruning**: Both 10% and 30% magnitude pruning recover meaningful knowledge without destroying the model — unlike at 1B scale where 30% pruning caused significant utility degradation (model_utility 0.456 → 0.279). At 8B, 30% pruning leaves model_utility at 0.630, essentially matching the oracle, while `forget_Q_A_Prob` reaches 0.938.
 
@@ -299,7 +299,7 @@ GradDiff α1 and SimNPO across three quantization levels (all on 1B model, TOFU 
 
 8-bit quantization produces negligible change in `forget_Q_A_Prob` relative to full precision — GradDiff α1: 0.061 → 0.066, SimNPO: 0.110 → 0.123. The large recovery effect seen in 4-bit is not present at 8-bit. Model utility is similarly unaffected by 8-bit.
 
-### Context: Guo et al. 2024
+### Context: Zhang et al. 2024
 
 The original paper ("Catastrophic Failure of LLM Unlearning via Quantization", ICLR 2025) used the MUSE benchmark (NEWS and BOOKS datasets), not TOFU. Their primary result was with 4-bit (post-training) quantization on models including Llama3-8B. The abstract reports an average of 21% forgotten knowledge retention at full precision, rising to 83% after 4-bit quantization. The paper also tested 8-bit but the headline claim is about 4-bit. Our 8-bit result on 1B/TOFU is directionally consistent with their finding that 8-bit is far less damaging than 4-bit.
 
@@ -341,7 +341,7 @@ Whether lighter pruning (5–15% sparsity) on this model, or the same techniques
 
 ## 2026-04-23 — Second session: core result replicated on TOFU
 
-### Key finding: 4-bit quantization recovers suppressed knowledge (Guo et al. effect confirmed)
+### Key finding: 4-bit quantization recovers suppressed knowledge (Zhang et al. effect confirmed)
 
 Oracle reference: `forget_truth_ratio = 0.628`
 
@@ -352,7 +352,7 @@ Oracle reference: `forget_truth_ratio = 0.628`
 | SimNPO | none | 0.514 | **0.110** | 0.381 | 0.592 |
 | SimNPO | 4-bit | 0.560 | **0.223** | 0.381 | 0.453 |
 
-**GradDiff α1** shows the clearest effect: `forget_Q_A_Prob` increases from 0.061 → 0.359 after 4-bit quantization (**6× increase**). The model had genuinely suppressed knowledge of the forget set at full precision, and quantization recovers most of it. Critically, model utility barely changes (0.456 → 0.440), consistent with Guo et al.'s theory: utility-constrained unlearning produces small weight perturbations that quantization grid-snapping washes out.
+**GradDiff α1** shows the clearest effect: `forget_Q_A_Prob` increases from 0.061 → 0.359 after 4-bit quantization (**6× increase**). The model had genuinely suppressed knowledge of the forget set at full precision, and quantization recovers most of it. Critically, model utility barely changes (0.456 → 0.440), consistent with Zhang et al.'s theory: utility-constrained unlearning produces small weight perturbations that quantization grid-snapping washes out.
 
 **SimNPO** shows the same direction but weaker: 0.110 → 0.223 (2× increase).
 
@@ -368,7 +368,7 @@ Comparing GradDiff α5 (from first session) vs α1:
 α5 weights retain loss 5× more than forget loss → weak suppression, nothing to recover. α1 (equal weighting) achieves real suppression, which is then fragile to quantization. This contrast cleanly demonstrates the mechanism.
 
 ### Lessons
-- `forget_Q_A_Prob` is the best primary metric for the Guo et al. analog (more sensitive than forget_truth_ratio)
+- `forget_Q_A_Prob` is the best primary metric for the Zhang et al. analog (more sensitive than forget_truth_ratio)
 - The recovery effect is only visible when baseline unlearning is genuine (low forget_Q_A_Prob at full precision)
 - Model utility degradation from 4-bit quantization is minimal for well-unlearned models (~1%), consistent with small-perturbation hypothesis
 
@@ -419,7 +419,7 @@ This is the ceiling — even a model that never saw the forget authors answers ~
 
 ### Interpretation
 
-`forget_truth_ratio` and `forget_quality` move in the Guo et al. direction (recovery) after 4-bit quantization for both methods. However the effect is weak because these checkpoints never achieved strong unlearning in the first place:
+`forget_truth_ratio` and `forget_quality` move in the Zhang et al. direction (recovery) after 4-bit quantization for both methods. However the effect is weak because these checkpoints never achieved strong unlearning in the first place:
 - GradDiff `alpha5`: retain loss weighted 5× higher than forget loss — aggressively preserves utility at the expense of forgetting. Baseline `forget_truth_ratio = 0.460` is only modestly below the oracle (0.628), meaning the forget set was barely suppressed.
 - NPO baseline: `forget_truth_ratio = 0.543`, essentially at oracle level — minimal unlearning achieved.
 
@@ -446,4 +446,4 @@ Higher `alpha` = more weight on retain loss = more conservative unlearning = wor
 | `forget_Q_A_ROUGE` | ROUGE score on forget-set Q&A | Low |
 | `model_utility` | Retain-set performance (model still useful?) | High |
 
-For demonstrating the Guo et al. effect, `forget_Q_A_Prob` turns out to be the clearest metric — it measures absolute probability of correct forget-set answers and shows dramatic changes in well-unlearned models. `forget_truth_ratio` is also useful as a relative measure robust to general quality degradation.
+For demonstrating the Zhang et al. effect, `forget_Q_A_Prob` turns out to be the clearest metric — it measures absolute probability of correct forget-set answers and shows dramatic changes in well-unlearned models. `forget_truth_ratio` is also useful as a relative measure robust to general quality degradation.

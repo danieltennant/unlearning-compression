@@ -1,6 +1,6 @@
 # Sweep: initial quantization experiments
 # Date: 2026-04-23
-# Goal: replicate Guo et al. recovery effect on TOFU with 4-bit quantization
+# Goal: replicate Zhang et al. recovery effect on TOFU with 4-bit quantization
 # Result: confirmed — GradDiff alpha1 shows 6x forget_Q_A_Prob recovery after 4-bit quant
 
 EXPERIMENTS=(

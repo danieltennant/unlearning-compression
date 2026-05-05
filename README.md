@@ -2,7 +2,7 @@
 
 Does compression reverse machine unlearning?
 
-[Guo et al. (2024)](https://arxiv.org/abs/2410.16454) showed that quantizing an unlearned LLM recovers 83% of supposedly forgotten knowledge on average, using NEWS and BOOKS datasets. This project translates that finding to the [TOFU](https://locuslab.github.io/tofu/) benchmark — a standardized unlearning testbed with 450+ public checkpoints via [open-unlearning](https://github.com/locuslab/open-unlearning) — and extends it to magnitude pruning and SVD truncation.
+[Zhang et al. (2024)](https://arxiv.org/abs/2410.16454) showed that quantizing an unlearned LLM recovers 83% of supposedly forgotten knowledge on average, using NEWS and BOOKS datasets. This project translates that finding to the [TOFU](https://locuslab.github.io/tofu/) benchmark — a standardized unlearning testbed with 450+ public checkpoints via [open-unlearning](https://github.com/locuslab/open-unlearning) — and extends it to magnitude pruning and SVD truncation.
 
 The core hypothesis transfers: if utility-constrained unlearning suppresses rather than erases knowledge, that should be visible under any compression method that reduces weight perturbations, not just quantization. TOFU provides a cleaner test than NEWS/BOOKS because the forget set is entirely synthetic, eliminating confounds from the model's pretraining exposure.
 
@@ -68,7 +68,7 @@ All experiments use the TOFU benchmark (`forget10` split, Llama-3.2-1B-Instruct 
 | 4-bit | 0.672 | 0.589 | **24×** |
 | 8-bit | 0.033 | 0.467 | negligible |
 
-The 4-bit recovery effect is stronger at 8B than 1B (24× vs 6×). The 8B model achieves stronger unlearning at full precision but is proportionally more vulnerable to quantization. This is consistent with the Guo et al. mechanism: utility-constrained unlearning produces weight perturbations smaller than the quantization step size, so the model snaps back to its pre-unlearning quantized values.
+The 4-bit recovery effect is stronger at 8B than 1B (24× vs 6×). The 8B model achieves stronger unlearning at full precision but is proportionally more vulnerable to quantization. This is consistent with the Zhang et al. mechanism: utility-constrained unlearning produces weight perturbations smaller than the quantization step size, so the model snaps back to its pre-unlearning quantized values.
 
 Weight delta analysis confirms this mechanistically: every weight change from both GradDiff and SimNPO falls within the int4 quantization step (max delta ≈ 2.2% of Δ_int4). 8-bit quantization is safe because Δ_int8 is 16× smaller than Δ_int4.
 
@@ -128,6 +128,6 @@ The implementation is working correctly — utility degrades gracefully rather t
 
 ## References
 
-- Guo et al., "Catastrophic Failure of LLM Unlearning via Quantization" (2024) — https://arxiv.org/abs/2410.16454
+- Zhang et al., "Catastrophic Failure of LLM Unlearning via Quantization" (2024) — https://arxiv.org/abs/2410.16454
 - Maini et al., "TOFU: A Task of Fictitious Unlearning for LLMs" (2024) — https://locuslab.github.io/tofu/
 - open-unlearning — https://github.com/locuslab/open-unlearning

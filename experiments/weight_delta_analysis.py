@@ -3,7 +3,7 @@
 Loads two models on CPU and computes per-layer statistics on the difference
 to explain why compression reverses unlearning:
 
-  1. Quantization grid test (Guo et al. 2024 Section 5):
+  1. Quantization grid test (Zhang et al. 2024 Section 5):
      If |W_delta| < Δ_int4 = max|w|/8, quantization snaps weight back to
      original value, erasing the unlearning signal.
 
@@ -75,7 +75,7 @@ def print_summary(per_layer: dict, aggregated: dict) -> None:
     print("WEIGHT DELTA ANALYSIS SUMMARY")
     print("=" * 70)
 
-    print("\n--- Quantization grid test (Guo et al. mechanism) ---")
+    print("\n--- Quantization grid test (Zhang et al. mechanism) ---")
     print(f"{'Module type':<20} {'layers':>6} {'frac<Δ_int4':>12} {'frac<Δ_int8':>12} {'max_delta/Δ_int4':>17}")
     print("-" * 70)
     for mtype, agg in sorted(aggregated.items()):
