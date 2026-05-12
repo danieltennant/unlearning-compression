@@ -4,6 +4,81 @@ Entries in reverse chronological order (newest first).
 
 ---
 
+## 2026-05-11 — Ninth session: RMU compression experiments and 20% pruning gap
+
+### Goal
+
+Run compression evals on new unlearning method checkpoints (RMU, NPO) and fill the 20% pruning gap for existing 1B models. All experiments on Llama-3.2-1B-Instruct, forget10 split, RTX 4090.
+
+### 20% pruning: GradDiff and SimNPO
+
+Filled the missing data point between 10% (recovery peak) and 30% (collapse) for the two existing 1B methods.
+
+| Method | Unlearned | 10% pruning | 20% pruning | 30% pruning |
+|--------|-----------|-------------|-------------|-------------|
+| GradDiff α1 | 0.061 / 0.456 | 0.737 / 0.567 | 0.422 / 0.464 | 0.126 / 0.279 |
+| SimNPO | 0.110 / 0.592 | 0.307 / 0.550 | 0.420 / 0.465 | 0.125 / 0.269 |
+
+*(forget_Q_A_Prob / model_utility)*
+
+For GradDiff, recovery peaks at 10% and drops at 20% — the unlearning signal is concentrated in the smallest weights, so 10% pruning removes most of it, and further pruning begins removing model capacity rather than additional unlearning signal. For SimNPO, recovery peaks at 20% — the signal is distributed across a slightly broader range of weight magnitudes than GradDiff.
+
+### RMU checkpoint scan
+
+Three RMU checkpoints available for Llama-3.2-1B-Instruct forget10. Ran uncompressed baseline evals to find which achieves meaningful unlearning:
+
+| Checkpoint | forget_Q_A_Prob | model_utility | Notes |
+|---|---|---|---|
+| lr1e-05_layer5_scoeff100_epoch10 | 0.490 | 0.525 | Barely unlearned — full model is ~0.60 |
+| **lr5e-05_layer10_scoeff10_epoch10** | **0.0021** | **0.498** | Strong unlearning, good utility — selected |
+| lr2e-05_layer10_scoeff100_epoch5 | 0.085 | 0.160 | Some unlearning but utility collapsed |
+
+The winning checkpoint (`lr5e-05_layer10_scoeff10_epoch10`) achieves forget_Q_A_Prob = 0.0021 — significantly below GradDiff (0.061) and far below the oracle (0.116) — while maintaining model_utility = 0.498, comparable to GradDiff (0.456). Hyperparameter sensitivity is high: a 5× lower learning rate barely unlearns, a higher scoeff with fewer epochs collapses utility.
+
+### RMU compression sweep — key finding: immune to compression recovery
+
+Ran 4-bit quantization, 8-bit quantization, and magnitude pruning at 10%, 20%, 30% sparsity on the best RMU checkpoint.
+
+| Compression | forget_Q_A_Prob | model_utility |
+|---|---|---|
+| None (baseline) | 0.0021 | 0.498 |
+| 8-bit quantization | 0.0020 | 0.497 |
+| 4-bit quantization | 0.0032 | 0.362 |
+| 10% pruning | 0.0021 | 0.434 |
+| 20% pruning | 0.0076 | 0.272 |
+| 30% pruning | 0.0038 | 0.069 |
+
+`forget_Q_A_Prob` stays near zero across all compression methods. The largest value observed is 0.0076 at 20% pruning — still far below the oracle (0.116) and qualitatively different from the large recovery seen in GradDiff (0.061 → 0.737 at 10% pruning) and SimNPO. Model utility degrades with pruning as expected, but the knowledge suppression is not reversed.
+
+**This is a genuine null result and is informative.** RMU is architecturally different from GradDiff and SimNPO: it steers internal activations at a specific transformer layer toward a random control vector, concentrating weight changes in a few layers at a higher learning rate rather than spreading small perturbations globally. The weight changes are large enough to survive both quantization and pruning. The mechanism is representation-level intervention rather than output-level loss suppression.
+
+**Interpretation:** The compression vulnerability seen in GradDiff and SimNPO is not a universal property of post-training compression. It is specific to gradient-based methods whose utility constraint keeps weight perturbations below the quantization step size (confirmed by the April 25 weight delta analysis). RMU avoids this failure mode not by design but as a consequence of how it operates — though this difference is meaningful for understanding what makes unlearning fragile.
+
+### NPO checkpoint scan
+
+Tested two NPO checkpoints for baseline unlearning quality:
+
+| Checkpoint | forget_Q_A_Prob | model_utility |
+|---|---|---|
+| lr2e-05_beta0.5_alpha1_epoch10 | 0.421 | 0.601 |
+| lr1e-05_beta0.1_alpha1_epoch10 | 0.213 | 0.395 |
+
+Neither achieves oracle-level unlearning (oracle: 0.116). The lr1e-05_beta0.1 checkpoint — which matches the repro.md hyperparameters — does partial suppression with significant utility loss. Did not run compression evals on these checkpoints: the baseline unlearning is incomplete enough that recovery results would be hard to interpret. NPO at 1B forget10 appears to be a difficult setting for this method.
+
+### Checkpoint IDs used
+
+- GradDiff: `open-unlearning/unlearn_tofu_Llama-3.2-1B-Instruct_forget10_GradDiff_lr1e-05_alpha1_epoch10`
+- SimNPO: `open-unlearning/unlearn_tofu_Llama-3.2-1B-Instruct_forget10_SimNPO_lr2e-05_b4.5_a1_d1_g0.25_ep10`
+- RMU (selected): `open-unlearning/unlearn_tofu_Llama-3.2-1B-Instruct_forget10_RMU_lr5e-05_layer10_scoeff10_epoch10`
+
+### Next steps
+
+- Update draft writeup with RMU result and complete 1B pruning table
+- Decide whether to pursue 8B RMU (would require training — no pre-existing checkpoint)
+- Decide whether to add NPO with a stronger unlearning result, or drop it
+
+---
+
 ## 2026-04-29 — Eighth session: Cholesky-whitened SVD baseline validation
 
 ### Goal
