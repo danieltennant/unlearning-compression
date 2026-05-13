@@ -70,7 +70,7 @@ All three unlearning methods achieve forget_Q_A_Prob below the oracle threshold 
 
 ### 3.2 Quantization
 
-**Figure 1** shows forget_Q_A_Prob and model_utility across quantization levels for all three methods.
+![Quantization results](figures/quantization.png)
 
 **Knowledge recovery** (`forget_Q_A_Prob`, lower = better unlearning):
 
@@ -98,7 +98,7 @@ All three unlearning methods achieve forget_Q_A_Prob below the oracle threshold 
 
 ### 3.3 Magnitude pruning
 
-**Figure 2** shows forget_Q_A_Prob and model_utility across pruning levels for all three methods.
+![Pruning results](figures/pruning.png)
 
 **Knowledge recovery** (`forget_Q_A_Prob`, lower = better unlearning):
 
