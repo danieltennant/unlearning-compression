@@ -4,6 +4,66 @@ Entries in reverse chronological order (newest first).
 
 ---
 
+## 2026-05-13 — Eleventh session: 8B SimNPO retrain (correct hyperparameters) and compression sweep
+
+### Goal
+
+Retrain 8B SimNPO with the correct hyperparameters (delta=1.0, gamma=0.25, matching the 1B checkpoint used throughout) and run the full compression sweep. Fills the last major gap in the results table.
+
+### 8B SimNPO retrain
+
+Previous session identified that the first 8B SimNPO training used the SimNPO.yaml defaults (delta=0.0, gamma=0.125) rather than the values used in the 1B checkpoint (delta=1.0, gamma=0.25), producing weak unlearning (forget_Q_A_Prob=0.568).
+
+Retrained with:
+```
+trainer.method_args.delta=1.0 trainer.method_args.gamma=0.25
+lr=2e-5, beta=4.5, alpha=1.0, 10 epochs, batch size 2 × 16 grad accum = 32 effective, single H100
+```
+
+Training eval at epoch 10: forget_Q_A_Prob = **0.089**, model_utility = 0.652.
+
+eval_compressed.py baseline (uncompressed): forget_Q_A_Prob = **0.088**, model_utility = **0.653**.
+
+Both below the retain90 oracle (0.104 / 0.648). 8B SimNPO is a clean baseline with better utility than GradDiff (0.465) and strong unlearning.
+
+Checkpoint saved to `/workspace/unlearning-compression/open-unlearning/saves/unlearn/tofu_Llama-3.1-8B-Instruct_forget10_SimNPO_d1_g0.25` and pushed to `dtennant/tofu-llama-8b-simnpo-d1-g025`.
+
+### 8B SimNPO compression sweep
+
+| Compression | forget_Q_A_Prob | model_utility |
+|---|---|---|
+| None (baseline) | 0.088 | 0.653 |
+| 8-bit quantization | 0.096 | 0.657 |
+| 4-bit quantization | 0.210 | 0.636 |
+| 10% pruning | 0.112 | 0.660 |
+| 20% pruning | 0.333 | 0.649 |
+| 30% pruning | **0.935** | **0.630** |
+
+*Oracle (retain90): 0.104 / 0.648*
+
+**8-bit**: negligible effect (0.088 → 0.096), consistent across all methods.
+
+**4-bit**: moderate recovery to 0.210. Substantially less than 8B GradDiff under 4-bit (0.028 → 0.672). SimNPO's larger weight perturbations survive quantization better than GradDiff's. Utility barely affected (0.636 vs 0.653 baseline).
+
+**10% pruning**: minimal recovery to 0.112 — just barely above the oracle threshold. SimNPO is notably more robust at this sparsity than GradDiff (which reached 0.187 at 10%). Utility unchanged.
+
+**20% pruning**: substantial recovery to 0.333. Model fully functional (0.649 ≈ oracle utility). This is the point where SimNPO's vulnerability becomes practically significant.
+
+**30% pruning**: near-complete recovery to 0.935. Effectively erases the unlearning while utility only drops slightly (0.630 vs 0.653 baseline). Unlike the 1B models (which collapse at 30%), the 8B model survives 30% pruning functionally intact.
+
+### Comparison: 8B SimNPO vs 8B GradDiff under pruning
+
+| Sparsity | GradDiff forget_Q_A_Prob | SimNPO forget_Q_A_Prob |
+|---|---|---|
+| None | 0.028 | 0.088 |
+| 10% | 0.187 | 0.112 |
+| 20% | 0.979 | 0.333 |
+| 30% | 0.938 | 0.935 |
+
+SimNPO is more robust to pruning at 10% and 20% sparsity but converges to the same catastrophic recovery at 30%. The methods reach similar final states under sufficient compression despite different baseline suppression depths and different intermediate trajectories.
+
+---
+
 ## 2026-05-12 — Tenth session: 8B experiments (GradDiff 20% pruning, SimNPO training attempt)
 
 ### Goal
