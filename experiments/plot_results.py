@@ -53,8 +53,8 @@ x_base    = np.arange(len(QUANT_LABELS))
 
 # ── Figure 1: Quantization (2 panels stacked) ─────────────────────────────────
 
-fig1, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=(6, 6), sharex=True)
-fig1.subplots_adjust(hspace=0.12)
+fig1, (ax_top, ax_bot) = plt.subplots(1, 2, figsize=(9, 4))
+fig1.subplots_adjust(wspace=0.32)
 
 # Top: forget_Q_A_Prob
 for i, (method, color) in enumerate(zip(METHODS, COLORS)):
@@ -69,10 +69,12 @@ ax_top.axhline(FULL_FORGET, color="gray", linestyle="--", linewidth=1.0,
 ax_top.set_ylabel("Forget-set probability")
 ax_top.set_ylim(0, 1.05)
 ax_top.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.1f"))
+ax_top.set_xticks(x_base)
+ax_top.set_xticklabels(QUANT_LABELS)
 ax_top.legend(fontsize=8, loc="upper left")
-ax_top.set_title("Quantization", fontsize=11, pad=8)
+ax_top.set_title("Knowledge recovery", fontsize=10, pad=6)
 
-# Bottom: model_utility
+# Right: model_utility
 for i, (method, color) in enumerate(zip(METHODS, COLORS)):
     vals = [QUANT[method][lbl][1] for lbl in QUANT_LABELS]
     ax_bot.bar(x_base + (i - 1) * bar_width, vals, bar_width,
@@ -86,6 +88,9 @@ ax_bot.set_ylabel("Model utility")
 ax_bot.set_ylim(0, 0.75)
 ax_bot.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.1f"))
 ax_bot.legend(fontsize=8, loc="lower right")
+ax_bot.set_title("Model utility", fontsize=10, pad=6)
+
+fig1.suptitle("Quantization", fontsize=12, fontweight="bold", y=1.02)
 
 for ext in ("pdf", "png"):
     p = out_dir / f"quantization.{ext}"
@@ -94,8 +99,8 @@ for ext in ("pdf", "png"):
 
 # ── Figure 2: Pruning (2 panels stacked) ──────────────────────────────────────
 
-fig2, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=(6, 6), sharex=True)
-fig2.subplots_adjust(hspace=0.12)
+fig2, (ax_top, ax_bot) = plt.subplots(1, 2, figsize=(9, 4))
+fig2.subplots_adjust(wspace=0.32)
 
 # Top: forget_Q_A_Prob
 for method, color in zip(METHODS, COLORS):
@@ -110,10 +115,13 @@ ax_top.axhline(FULL_FORGET, color="gray", linestyle="--", linewidth=1.0,
 ax_top.set_ylabel("Forget-set probability")
 ax_top.set_ylim(0, 1.05)
 ax_top.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.1f"))
+ax_top.set_xticks(PRUNE_X)
+ax_top.set_xticklabels([f"{x}%" for x in PRUNE_X])
+ax_top.set_xlabel("Sparsity (%)")
 ax_top.legend(fontsize=8, loc="upper left")
-ax_top.set_title("Magnitude pruning", fontsize=11, pad=8)
+ax_top.set_title("Knowledge recovery", fontsize=10, pad=6)
 
-# Bottom: model_utility
+# Right: model_utility
 for method, color in zip(METHODS, COLORS):
     vals = [PRUNE[method][x][1] for x in PRUNE_X]
     ax_bot.plot(PRUNE_X, vals, marker="o", color=color, label=method,
@@ -128,6 +136,9 @@ ax_bot.set_xticklabels([f"{x}%" for x in PRUNE_X])
 ax_bot.set_ylim(0, 0.75)
 ax_bot.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.1f"))
 ax_bot.legend(fontsize=8, loc="lower right")
+ax_bot.set_title("Model utility", fontsize=10, pad=6)
+
+fig2.suptitle("Magnitude pruning", fontsize=12, fontweight="bold", y=1.02)
 
 for ext in ("pdf", "png"):
     p = out_dir / f"pruning.{ext}"
