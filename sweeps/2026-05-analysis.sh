@@ -34,6 +34,7 @@ echo "=== [2/4] Push RMU checkpoint to HuggingFace ==="
 $PYTHON -c "
 from huggingface_hub import HfApi
 api = HfApi()
+api.create_repo(repo_id='$RMU_HF', repo_type='model', exist_ok=True)
 api.upload_folder(
     folder_path='$RMU_LOCAL',
     repo_id='$RMU_HF',
