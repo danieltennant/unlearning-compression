@@ -114,29 +114,29 @@ def run_logit_lens(lm: LanguageModel, tokenized: list[dict],
     layer norm + lm_head. Index 0 = after embedding (before any transformer
     layer). Index n_layers = final output (matches model's normal output).
     """
-    tokenizer = lm.tokenizer
     probs = np.zeros((n_layers + 1, len(tokenized)))
+    model_device = next(lm.parameters()).device
 
     for qi, sample in enumerate(tokenized):
-        ids = sample["input_ids"].unsqueeze(0)  # (1, seq_len)
+        ids = sample["input_ids"].unsqueeze(0).to(model_device)
         ans_start = sample["answer_start"]
 
-        layer_logits = {}
+        layer_residuals = {}
 
         with lm.trace(ids, validate=False):
-            # Embedding output (before transformer layers)
-            emb_hs = lm.model.embed_tokens.output.save()
-            emb_normed = lm.model.norm(emb_hs)
-            layer_logits[0] = lm.lm_head(emb_normed).save()
-
+            layer_residuals[0] = lm.model.embed_tokens.output.save()
             for i in range(n_layers):
-                hs = lm.model.layers[i].output[0]
-                normed = lm.model.norm(hs)
-                layer_logits[i + 1] = lm.lm_head(normed).save()
+                layer_residuals[i + 1] = lm.model.layers[i].output[0].save()
 
-        for i in range(n_layers + 1):
-            logits = layer_logits[i].value[0]  # (seq_len, vocab)
-            probs[i, qi] = answer_prob_from_logits(logits, sample["input_ids"], ans_start)
+        # Apply norm + lm_head outside the trace on plain tensors
+        with torch.no_grad():
+            for i in range(n_layers + 1):
+                hs = layer_residuals[i].to(model_device)
+                normed = lm.model.norm(hs)
+                logits = lm.lm_head(normed)[0]  # (seq_len, vocab)
+                probs[i, qi] = answer_prob_from_logits(
+                    logits.cpu(), sample["input_ids"], ans_start
+                )
 
     return probs
 
@@ -164,7 +164,7 @@ def cache_residuals(lm: LanguageModel, tokenized: list[dict],
                 saved[i] = lm.model.layers[i].output[0].save()
 
         for i in range(n_layers):
-            per_layer[i].append(saved[i].value[0].cpu())  # (seq_len, d_model)
+            per_layer[i].append(saved[i][0].cpu())  # (seq_len, d_model)
 
     for i in range(n_layers):
         torch.save(per_layer[i], cache_dir / f"layer_{i:02d}.pt")
@@ -191,14 +191,15 @@ def run_patching(lm: LanguageModel, tokenized: list[dict],
         for qi, sample in enumerate(tokenized):
             ids = sample["input_ids"].unsqueeze(0)
             ans_start = sample["answer_start"]
-            patch_val = full_residuals[qi].to(lm.device)  # (seq_len, d_model)
+            model_device = next(lm.parameters()).device
+            patch_val = full_residuals[qi].to(model_device)  # (seq_len, d_model)
 
             with lm.trace(ids, validate=False):
                 # Replace residual stream at this layer with the full model's
                 lm.model.layers[patch_layer].output[0][:] = patch_val.unsqueeze(0)
                 logits_out = lm.lm_head.output.save()
 
-            logits = logits_out.value[0]
+            logits = logits_out[0].cpu()
             probs[patch_layer, qi] = answer_prob_from_logits(
                 logits, sample["input_ids"], ans_start
             )
@@ -310,7 +311,7 @@ def main():
     n_questions = len(tokenized)
 
     lm_full = LanguageModel(args.full_model_id, device_map="auto",
-                            torch_dtype=torch.float16, dispatch=True)
+                            torch_dtype=torch.float16)
     n_layers = get_n_layers(lm_full)
     print(f"  n_layers={n_layers}")
 
@@ -335,7 +336,7 @@ def main():
     for method_name, model_id in methods.items():
         print(f"\n=== {method_name}: {model_id} ===")
         lm = LanguageModel(model_id, device_map="auto",
-                           torch_dtype=torch.float16, dispatch=True)
+                           torch_dtype=torch.float16)
 
         print(f"  Running logit lens ({method_name})...")
         method_lens = run_logit_lens(lm, tokenized, n_layers)
