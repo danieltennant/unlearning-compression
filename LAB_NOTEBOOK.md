@@ -4,6 +4,54 @@ Entries in reverse chronological order (newest first).
 
 ---
 
+## 2026-05-12 — Tenth session: 8B experiments (GradDiff 20% pruning, SimNPO training attempt)
+
+### Goal
+
+Fill the 8B GradDiff 20% pruning gap and train 8B SimNPO for the scale comparison. Both experiments on Llama-3.1-8B-Instruct, forget10, RTX H100 (80GB).
+
+### 8B GradDiff 20% pruning
+
+| Compression | forget_Q_A_Prob | model_utility |
+|---|---|---|
+| None (baseline) | 0.028 | 0.465 |
+| 10% pruning | 0.187 | 0.543 |
+| **20% pruning** | **0.979** | **0.637** |
+| 30% pruning | 0.938 | 0.630 |
+
+20% pruning produces more recovery than 30% (0.979 vs 0.938) while maintaining essentially the same utility. The 8B model's pruning recovery is monotonically increasing from 10% → 20%, unlike the 1B model where recovery peaks at 10% and then decreases. At 20% sparsity the forget_Q_A_Prob nearly reaches the full model ceiling (0.992) while model_utility matches the oracle (0.648).
+
+This is the strongest single compression result in the dataset.
+
+### 8B SimNPO training — weak unlearning, hyperparameter issue identified
+
+Trained 8B SimNPO using the open-unlearning training harness with:
+- lr=2e-5, beta=4.5, alpha=1.0, **delta=0.0, gamma=0.125** (SimNPO.yaml defaults)
+- 10 epochs, batch size 2 × 16 grad accum = 32 effective, single H100
+
+Final eval (epoch 10): forget_Q_A_Prob = **0.568**, model_utility = 0.646.
+
+The unlearning is very weak — forget_Q_A_Prob = 0.568 vs full model 0.992 and oracle 0.104. The model utility is excellent but the forget set is barely suppressed.
+
+**Root cause identified**: the 1B SimNPO checkpoint we've been using (`lr2e-05_b4.5_a1_d1_g0.25_ep10`) has delta=1.0 and gamma=0.25, but the default SimNPO.yaml has delta=0.0 and gamma=0.125. We trained 8B with the wrong defaults. The retrain will use delta=1.0, gamma=0.25 to match the 1B checkpoint hyperparameters.
+
+Checkpoint pushed to `dtennant/tofu-llama-8b-simnpo` (will be overwritten by retrain).
+
+### Infrastructure issues
+
+- Root disk (/root, 20GB) was 100% full — all installs and downloads must go to /workspace
+- `HF_HOME` must be set to `/workspace/.cache/huggingface` (not /root)
+- `tensorboard` missing → fixed with `trainer.args.report_to=none`
+- `accelerate` not in PATH when called from nohup script → fixed by using full venv path `/workspace/unlearning-compression/.venv/bin/accelerate`
+- Workspace quota is 100GB (df shows full pool capacity, not user quota) — must monitor manually with `du`
+
+### Next steps
+
+- Retrain 8B SimNPO with delta=1.0, gamma=0.25 to match 1B checkpoint hyperparameters
+- If unlearning is strong, run compression sweep (4-bit, 8-bit, 10/20/30% pruning)
+
+---
+
 ## 2026-05-11 — Ninth session: RMU compression experiments and 20% pruning gap
 
 ### Goal
