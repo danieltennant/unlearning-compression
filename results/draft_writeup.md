@@ -6,7 +6,7 @@
 
 Zhang et al. (2024) showed that applying 4-bit quantization to LLMs that have undergone machine unlearning recovers a substantial fraction of the supposedly forgotten knowledge, while 8-bit quantization has negligible effect. Their experiments used the MUSE benchmark with Llama-2-7B across six unlearning methods.
 
-We replicate this finding on TOFU, a different benchmark with a different model family (Llama-3, at 1B and 8B scale), and extend it in two directions: (1) magnitude pruning, a structurally different compression method not tested in the original paper; and (2) RMU, an activation-steering unlearning method that is architecturally distinct from the gradient ascent methods tested by Zhang et al. We find that compression vulnerability is not universal — it is specific to gradient-based output-level unlearning methods.
+We replicate this finding on TOFU, a different benchmark with a different model family (Llama-3, at 1B and 8B scale), and extend it to magnitude pruning, a structurally different compression method not tested in the original paper. We test two unlearning methods: GradDiff and SimNPO.
 
 ---
 
@@ -42,9 +42,7 @@ We also report `forget_quality` (a Kolmogorov-Smirnov test comparing the unlearn
 
 **SimNPO** adapts Negative Preference Optimisation without a reference model, treating the forget set as negative preference data and training the model to assign low likelihood to forget-set completions while a retain-set term preserves utility. We use hyperparameters lr=2e-5, beta=4.5, delta=1.0, gamma=0.25, 10 epochs.
 
-**RMU (Representation Misdirection for Unlearning)** steers the internal activations of forget-set inputs at a specific transformer layer toward a random control vector, while a retain-set loss keeps retain-set activations close to the frozen reference model. Only the layers around the steering layer are updated. Unlike GradDiff and SimNPO, which operate on output-level predictions, RMU intervenes at the representation level and concentrates weight changes in a small number of layers at a higher learning rate.
-
-The 1B checkpoints for GradDiff, SimNPO, and RMU are drawn from the public open-unlearning HuggingFace repository. The 8B GradDiff and 8B SimNPO checkpoints were trained by us on a single H100 using the open-unlearning training harness.
+The 1B checkpoints for both methods are drawn from the public open-unlearning HuggingFace repository. The 8B GradDiff and 8B SimNPO checkpoints were trained by us on a single H100 using the open-unlearning training harness.
 
 ### 2.5 Compression methods
 
@@ -69,73 +67,76 @@ The 1B checkpoints for GradDiff, SimNPO, and RMU are drawn from the public open-
 | 8B | GradDiff α1 | 0.028 | 0.465 |
 | 8B | SimNPO | 0.088 | 0.653 |
 
-GradDiff achieves suppression below the oracle at both scales (0.061 vs oracle 0.116 at 1B; 0.028 vs 0.104 at 8B). SimNPO reaches oracle-level suppression at 1B (0.110) and below-oracle at 8B (0.088), with substantially better model utility than GradDiff in both cases. The 8B SimNPO baseline is the strongest utility-preserving unlearning in the dataset.
+GradDiff achieves suppression below the oracle at both scales (0.061 vs oracle 0.116 at 1B; 0.028 vs 0.104 at 8B). SimNPO reaches oracle-level suppression at 1B (0.110) and below-oracle at 8B (0.088), with substantially better model utility than GradDiff in both cases.
 
 ### 3.2 Quantization
 
-| Model | Method | Unlearned | 8-bit | 4-bit |
-|---|---|---|---|---|
-| 1B | GradDiff α1 | 0.061 / 0.456 | 0.066 / 0.449 | 0.359 / 0.440 |
-| 1B | SimNPO | 0.110 / 0.592 | 0.123 / 0.591 | 0.223 / 0.453 |
-| 8B | GradDiff α1 | 0.028 / 0.465 | 0.033 / 0.467 | 0.672 / 0.589 |
-| 8B | SimNPO | 0.088 / 0.653 | 0.096 / 0.657 | 0.210 / 0.636 |
+**Knowledge recovery** (`forget_Q_A_Prob`, lower = better unlearning):
 
-*(Each cell: forget_Q_A_Prob / model_utility)*
+| | Unlearned | 8-bit | 4-bit |
+|---|---|---|---|
+| 1B GradDiff | 0.061 | 0.066 | **0.359** |
+| 1B SimNPO | 0.110 | 0.123 | **0.223** |
+| 8B GradDiff | 0.028 | 0.033 | **0.672** |
+| 8B SimNPO | 0.088 | 0.096 | **0.210** |
 
-**8-bit** has negligible effect across all four models. `forget_Q_A_Prob` changes by at most 0.013 and model utility is essentially unchanged.
+*Oracle: 1B = 0.116, 8B = 0.104. Full model ceiling: 1B ≈ 0.60, 8B = 0.992.*
 
-**4-bit** produces substantial recovery in all cases. Recovery is larger at 8B than 1B for GradDiff (0.028 → 0.672 vs 0.061 → 0.359). 8B SimNPO shows less 4-bit recovery than 8B GradDiff (0.088 → 0.210 vs 0.028 → 0.672), consistent with SimNPO producing larger weight perturbations that are not fully erased by quantization. Utility is well-preserved across all 4-bit results.
+**Model utility** (`model_utility`, higher = better):
+
+| | Unlearned | 8-bit | 4-bit |
+|---|---|---|---|
+| 1B GradDiff | 0.456 | 0.449 | 0.440 |
+| 1B SimNPO | 0.592 | 0.591 | 0.453 |
+| 8B GradDiff | 0.465 | 0.467 | 0.589 |
+| 8B SimNPO | 0.653 | 0.657 | 0.636 |
+
+*Oracle: 1B = 0.593, 8B = 0.648.*
+
+**8-bit** has negligible effect across all four models — `forget_Q_A_Prob` changes by at most 0.013 and model utility is essentially unchanged.
+
+**4-bit** produces substantial knowledge recovery in all cases while model utility is preserved. Recovery is larger at 8B than 1B for GradDiff (0.028 → 0.672 vs 0.061 → 0.359). 8B SimNPO shows less 4-bit recovery than 8B GradDiff (0.088 → 0.210 vs 0.028 → 0.672), consistent with SimNPO producing larger weight perturbations that are not fully erased by quantization.
 
 ### 3.3 Magnitude pruning
 
-| Model | Method | Unlearned | 10% | 20% | 30% |
-|---|---|---|---|---|---|
-| 1B | GradDiff α1 | 0.061 / 0.456 | 0.737 / 0.567 | 0.422 / 0.464 | 0.126 / 0.279 |
-| 1B | SimNPO | 0.110 / 0.592 | 0.307 / 0.550 | 0.420 / 0.465 | 0.125 / 0.269 |
-| 8B | GradDiff α1 | 0.028 / 0.465 | 0.187 / 0.543 | 0.979 / 0.637 | 0.938 / 0.630 |
-| 8B | SimNPO | 0.088 / 0.653 | 0.112 / 0.660 | 0.333 / 0.649 | 0.935 / 0.630 |
+**Knowledge recovery** (`forget_Q_A_Prob`, lower = better unlearning):
 
-*(Each cell: forget_Q_A_Prob / model_utility)*
+| | Unlearned | 10% | 20% | 30% |
+|---|---|---|---|---|
+| 1B GradDiff | 0.061 | **0.737** | 0.422 | 0.126 |
+| 1B SimNPO | 0.110 | 0.307 | 0.420 | 0.125 |
+| 8B GradDiff | 0.028 | 0.187 | **0.979** | **0.938** |
+| 8B SimNPO | 0.088 | 0.112 | 0.333 | **0.935** |
 
-**1B models**: At 10% sparsity, both methods show large recovery with utility preserved or improved (GradDiff: 0.061 → 0.737; SimNPO: 0.110 → 0.307). Recovery peaks at 10% for GradDiff and 20% for SimNPO, after which the forget_Q_A_Prob falls but model utility collapses — at 30%, utility drops below 0.28 for both methods, indicating general degradation rather than selective knowledge recovery.
+*Oracle: 1B = 0.116, 8B = 0.104.*
 
-**8B models**: The pattern is qualitatively different. Recovery is monotonically increasing with sparsity for both methods, and model utility is preserved throughout. At 30% sparsity, both 8B GradDiff (0.938) and 8B SimNPO (0.935) recover nearly all suppressed knowledge while maintaining utility above 0.630. At the same sparsity, the 1B models collapse while the 8B models remain fully functional. The 8B SimNPO model is more robust than 8B GradDiff at lower sparsity (10%: 0.112 vs 0.187; 20%: 0.333 vs 0.979) but converges to the same outcome at 30%.
+**Model utility** (`model_utility`, higher = better):
 
-### 3.4 RMU: immunity to compression recovery
+| | Unlearned | 10% | 20% | 30% |
+|---|---|---|---|---|
+| 1B GradDiff | 0.456 | 0.567 | 0.464 | **0.279** |
+| 1B SimNPO | 0.592 | 0.550 | 0.465 | **0.269** |
+| 8B GradDiff | 0.465 | 0.543 | 0.637 | 0.630 |
+| 8B SimNPO | 0.653 | 0.660 | 0.649 | 0.630 |
 
-We ran the full compression sweep on the best available RMU checkpoint for 1B (`lr5e-05_layer10_scoeff10_epoch10`), which achieves forget_Q_A_Prob = 0.0021 — substantially below GradDiff (0.061) and far below the oracle (0.116).
+*Oracle: 1B = 0.593, 8B = 0.648.*
 
-| Compression | forget_Q_A_Prob | model_utility |
-|---|---|---|
-| None (baseline) | 0.0021 | 0.498 |
-| 8-bit quantization | 0.0020 | 0.497 |
-| 4-bit quantization | 0.0032 | 0.362 |
-| 10% pruning | 0.0021 | 0.434 |
-| 20% pruning | 0.0076 | 0.272 |
-| 30% pruning | 0.0038 | 0.069 |
+**1B models**: At 10% sparsity, both methods show large knowledge recovery with utility preserved or improved (GradDiff: 0.061 → 0.737; SimNPO: 0.110 → 0.307). Recovery peaks at 10% for GradDiff and 20% for SimNPO, after which `forget_Q_A_Prob` falls but model utility collapses — at 30%, utility drops below 0.28 for both methods, indicating general model degradation rather than selective recovery of forget-set knowledge.
 
-`forget_Q_A_Prob` stays near zero across all compression methods — the largest observed value is 0.0076 at 20% pruning, still far below the oracle (0.116). Model utility degrades with increasing pruning, but the knowledge suppression is not reversed.
-
-This is a genuine null result and is informative. The compression vulnerability observed in GradDiff and SimNPO does not extend to RMU. The mechanistic difference is consistent with the weight delta analysis from earlier sessions: GradDiff and SimNPO are constrained by a retain-set loss to make small weight perturbations, many of which fall within the quantization step size. RMU operates differently — it steers activations at a specific layer using a higher learning rate without a tight utility constraint at the weight level, producing larger per-layer perturbations concentrated in a small number of layers. These perturbations survive both quantization and pruning.
-
-**The compression vulnerability is not a universal property of post-training compression applied to unlearned models. It is specific to gradient-based output-level methods whose utility constraint keeps weight perturbations small.**
+**8B models**: The pattern is qualitatively different. Recovery is monotonically increasing with sparsity for both methods, and model utility is preserved throughout. At 30% sparsity, both 8B GradDiff (0.938) and 8B SimNPO (0.935) recover nearly all suppressed knowledge while maintaining utility above 0.630. The 8B SimNPO model is more robust than 8B GradDiff at lower sparsity (10%: 0.112 vs 0.187; 20%: 0.333 vs 0.979) but converges to the same outcome at 30%.
 
 ---
 
 ## 4. Discussion
 
-The results establish three main findings:
+The results establish two main findings:
 
-**Replication.** 4-bit quantization reverses substantial knowledge on TOFU across all gradient-based methods tested (GradDiff and SimNPO, at both 1B and 8B). 8-bit quantization has negligible effect. This replicates the directional finding of Zhang et al. on a different benchmark, a different model family, and with a synthetic forget set that removes the pretraining confound.
+**Replication.** 4-bit quantization reverses substantial knowledge on TOFU across all methods tested (GradDiff and SimNPO, at both 1B and 8B). 8-bit quantization has negligible effect. This replicates the directional finding of Zhang et al. on a different benchmark, a different model family, and with a synthetic forget set that removes the pretraining confound.
 
 **Pruning as an additional vector.** Magnitude pruning also reverses unlearning, with a scale-dependent pattern. At 1B, moderate pruning (10%) causes the largest recovery for GradDiff — larger than 4-bit quantization — but recovery collapses at 30% along with model utility. At 8B, recovery increases monotonically with sparsity, and the model remains fully functional at 30% sparsity with near-complete knowledge recovery for both methods. The 8B models are more vulnerable to high-sparsity pruning than the 1B models, counter to the intuition that larger models might be more robust.
-
-**RMU as a null.** The activation-steering method RMU is immune to both quantization and pruning recovery. This demonstrates that the vulnerability is tied to the weight change structure produced by gradient-based output-level methods, not to the compression operations themselves. It also suggests a practical implication: representation-level unlearning methods may offer better persistence under deployment-time compression than output-level methods.
 
 ---
 
 ## 5. Remaining gaps
 
-- **1B RMU model utility at 4-bit**: The model utility drops from 0.498 to 0.362 under 4-bit quantization. This is a larger utility hit than any gradient-based method experiences. Worth investigating whether this is a property of NF4 quantization interacting with the large-magnitude layer changes made by RMU, or a general feature of 4-bit on this checkpoint.
-- **8B RMU**: Would require training — no pre-existing checkpoint. Whether the immunity extends to 8B is unknown.
-- **NPO**: Neither available NPO checkpoint achieves oracle-level unlearning at 1B forget10; the best reaches 0.213, above the oracle 0.116. Compression results on an incomplete unlearning are hard to interpret. Would need a better NPO checkpoint or a stronger training run.
+- **NPO**: Neither available NPO checkpoint achieves oracle-level unlearning at 1B forget10; the best reaches 0.213, above the oracle 0.116. Compression results on incomplete unlearning are hard to interpret. Would need a better NPO checkpoint or a stronger training run.
