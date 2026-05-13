@@ -34,7 +34,6 @@ CUDA_VISIBLE_DEVICES=0 $ACCELERATE launch \
     trainer.args.report_to=none \
     ++trainer.args.remove_unused_columns=false \
     "trainer.method_args.module_regex=model\.layers\.7" \
-    "trainer.method_args.trainable_params_regex=[model\.layers\.(5|6|7)\.mlp\.down_proj\.weight]" \
     trainer.method_args.steering_coeff=2
 cd ..
 echo "=== [1/5] training done ==="
