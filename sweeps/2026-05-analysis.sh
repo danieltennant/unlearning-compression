@@ -24,7 +24,8 @@ SIMNPO_HF="dtennant/tofu-llama-8b-simnpo"
 # ── [1/4] Install nnsight ──────────────────────────────────────────────────────
 
 echo "=== [1/4] Install nnsight ==="
-.venv/bin/pip install "nnsight>=0.3" --quiet
+$PYTHON -m ensurepip --upgrade --quiet 2>/dev/null || true
+$PYTHON -m pip install "nnsight>=0.3" --quiet
 echo "=== [1/4] done ==="
 
 # ── [2/4] Push RMU checkpoint to HuggingFace ──────────────────────────────────
