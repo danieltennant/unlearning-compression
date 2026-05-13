@@ -4,6 +4,54 @@ Entries in reverse chronological order (newest first).
 
 ---
 
+## 2026-05-13 — Twelfth session: 8B RMU training and compression sweep
+
+### Goal
+
+Train 8B RMU and run the full compression sweep. Motivated by the 1B RMU result appearing to show compression immunity, and by the poor model utility of the 1B checkpoint we used (0.498 vs oracle 0.593). Used RMU.yaml defaults: layer 7, scoeff 2, lr 1e-5, 10 epochs, all parameters trainable.
+
+### 8B RMU training
+
+Checkpoint: `tofu_Llama-3.1-8B-Instruct_forget10_RMU_layer7_scoeff2`
+
+Training trajectory:
+
+| Epoch | forget_Q_A_Prob | model_utility |
+|---|---|---|
+| 0 (pre-training) | 0.991 | 0.627 |
+| 1 | 0.947 | 0.648 |
+| 2 | 0.913 | 0.627 |
+| 3 | 0.560 | 0.631 |
+| 4 | 0.240 | 0.633 |
+| 5 | 0.108 | 0.633 |
+| 6 | 0.075 | 0.637 |
+| 9 (final) | 0.066 | 0.639 |
+
+Strong nonlinear drop between epochs 2 and 5 — the steering vector appears to cross a threshold where it dominates the representations. Model utility holds steady throughout (0.627–0.639). Final result: forget_Q_A_Prob=0.066 (below oracle 0.104), model_utility=0.639.
+
+### 8B RMU compression sweep — key finding: NOT immune
+
+| Compression | forget_Q_A_Prob | model_utility |
+|---|---|---|
+| None (baseline) | 0.067 | 0.637 |
+| 8-bit quantization | 0.083 | 0.638 |
+| 4-bit quantization | **0.649** | 0.614 |
+| 10% pruning | 0.124 | 0.630 |
+| 20% pruning | **0.963** | 0.622 |
+| 30% pruning | **0.940** | 0.639 |
+
+*Oracle: 0.104 / 0.648*
+
+**8B RMU is not immune to compression recovery.** 4-bit quantization causes large recovery (0.067 → 0.649), comparable to 8B GradDiff (0.028 → 0.672). Pruning at 20% and 30% causes near-complete recovery (0.963, 0.940) with model utility intact — same catastrophic pattern as GradDiff and SimNPO.
+
+**This contradicts the 1B RMU immunity result.** The 1B checkpoint (`lr5e-05_layer10_scoeff10_epoch10`) showed forget_Q_A_Prob staying near 0.002 across all compression methods. The 8B result with different hyperparameters shows full vulnerability. The 1B immunity was likely specific to that checkpoint's hyperparameter configuration and should not be generalized. The claim that RMU avoids compression vulnerability by design is not supported.
+
+### Infrastructure note
+
+Hydra override grammar cannot parse regex with alternation `(a|b)` inside a list argument — `trainable_params_regex=[model\.layers\.(5|6|7)\....]` fails. Fix: omit the override and use the yaml default (`.*`, train all params).
+
+---
+
 ## 2026-05-13 — Eleventh session: 8B SimNPO retrain (correct hyperparameters) and compression sweep
 
 ### Goal
