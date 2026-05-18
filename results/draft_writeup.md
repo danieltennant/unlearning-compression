@@ -1,4 +1,4 @@
-# Compression Reverses Machine Unlearning: Replication and Extension on TOFU
+# Compression Reverses Machine Unlearning
 
 ---
 
@@ -6,11 +6,11 @@
 
 Machine unlearning refers to techniques for selectively removing specific knowledge or capabilities from a trained model without retraining from scratch. Full retraining is expensive and often impractical for large models, so unlearning has emerged as a practical tool for several use cases: compliance with data deletion requests under regulations like GDPR, removal of copyrighted content a model was trained on, and — most relevant for AI safety — the targeted removal of dangerous capabilities such as knowledge of weapons synthesis or other hazardous content.
 
-The safety application is particularly motivated. As AI systems become more capable, the ability to selectively remove harmful knowledge while preserving general capability is increasingly valuable. If a model can be trained to assist with dangerous tasks, unlearning offers a potential remediation pathway: identify the unwanted capability, apply an unlearning method, and deploy the modified model. Several major AI labs and government bodies have pointed to unlearning as a component of a responsible deployment toolkit.
+As AI systems become more capable, the ability to selectively remove harmful knowledge while preserving general capability is increasingly valuable. If a model can be trained to assist with dangerous tasks, unlearning offers a potential remediation pathway: identify the unwanted capability, apply an unlearning method, and deploy the modified model. Unlearning has attracted significant research interest from major AI labs as a potential safety control, particularly for removing dangerous capabilities from a model after the fact. The GDPR's right to erasure creates parallel regulatory pressure for techniques that can remove specific training data on demand. Whether current unlearning methods are reliable enough to serve as actual safety controls — not just laboratory demonstrations — is an open question.
 
-The problem this paper investigates is whether unlearning is actually doing what it appears to do. Modern LLMs are rarely deployed in their original form. They are routinely compressed — quantized to 4-bit or 8-bit precision to run on consumer hardware, or pruned to reduce memory and latency. If a model is unlearned and then compressed for deployment, does the unlearning hold? Zhang et al. (2024) showed that it often does not: applying 4-bit quantization to models that have undergone machine unlearning recovers a substantial fraction of the supposedly forgotten knowledge. A developer who tests an unlearned model at full precision, then distributes a quantized version, may be shipping a model that has silently recovered the knowledge they intended to remove.
+As part of a BlueDot Impact Technical AI Safety project sprint, I decided to experiment with unlearning techniques.  The problem I investigated here is whether unlearning is affected by practical compression techniques. Modern LLMs are rarely deployed in their original form. They are routinely compressed — quantized to 4-bit or 8-bit precision to run on consumer hardware, or pruned to reduce memory and latency. If a model is unlearned and then compressed for deployment, does the unlearning hold?  Zhang et al. (2024) showed one case where it does not: applying 4-bit quantization to models that have undergone machine unlearning recovers a substantial fraction of the supposedly forgotten knowledge. A developer who tests an unlearned model at full precision, then distributes a quantized version, may be shipping a model that has silently recovered the knowledge they intended to remove.
 
-Zhang et al.'s experiments used the MUSE benchmark with Llama-2-7B across six unlearning methods. I replicate their finding on TOFU, a different benchmark with a different model family (Llama-3.1-8B-Instruct), and extend it to magnitude pruning, a structurally different compression method not tested in the original paper. I also investigate the weight-level mechanism behind the vulnerability, and find that the unlearning methods differ in how they store the forgetting signal in the model's weights — which determines how much of that signal survives compression.
+Zhang et al.'s experiments used the MUSE benchmark with Llama-2-7B across six unlearning methods. I replicate their finding on the Tasks of Ficticious Unlearning (TOFU) benchmark, a different benchmark with a different model family (Llama-3.1-8B-Instruct), and extend it to magnitude pruning, a structurally different compression method not tested in the original paper. I also tested some different unlearning techniques, GradDiff, SimNPO, and RMU from the open-unlearning eval framework.  I also investigated the weight-level mechanism behind the vulnerability, and find that the unlearning methods differ in how they store the forgetting signal in the model's weights — which determines how much of that signal survives compression.
 
 ---
 
@@ -170,7 +170,17 @@ GradDiff's unlearning signal is heavily concentrated in low-magnitude MLP weight
 
 ---
 
-## 5. Next steps
+## 5. Conclusion
+
+Across three structurally different unlearning methods and two compression families, compression reverses unlearning. 4-bit quantization recovers substantial forget-set knowledge for all three methods tested; 8-bit quantization has negligible effect. Magnitude pruning also reverses unlearning, with recovery increasing monotonically with sparsity and reaching near-full recovery at 30% for all methods — while model utility is preserved throughout. This pattern holds on a synthetic benchmark (TOFU) with a different model family (Llama-3.1-8B-Instruct) than the original Zhang et al. result, and extends to a compression mechanism — unstructured weight removal — that was not tested in that work.
+
+The weight delta analysis reveals why: across all three methods, unlearning perturbations are small relative to the weights they modify and concentrated in the low-magnitude weights that compression removes first. SimNPO's relative robustness to 4-bit quantization follows directly from it producing larger weight changes than GradDiff or RMU — harder to round away — but this advantage does not survive aggressive pruning. All three methods converge to near-full knowledge recovery at 30% sparsity.
+
+The implication for the safety case for unlearning is direct. If unlearning is to serve as a reliable mechanism for capability control — removing dangerous knowledge before deployment — the unlearned model must remain unlearned under the compression that deployment typically involves. None of the methods tested here satisfy that requirement. A developer who validates an unlearned model at full precision and then distributes a quantized or pruned version may be shipping a model that has silently recovered the knowledge they intended to remove.
+
+---
+
+## 6. Future directions
 
 **Replication on MUSE.** The most direct extension would be to run the same compression sweep on MUSE (NEWS and BOOKS splits) with Llama-3.1-8B. MUSE uses ROUGE-based metrics (VerbMem, KnowMem) and includes a membership inference metric (PrivLeak), so the results would not be directly comparable numerically, but directional consistency would strengthen the case that the vulnerability is benchmark-agnostic. The main complication is the pretraining confound — MUSE's real-data splits mean some knowledge recovery may reflect pretraining exposure rather than unlearning failure, which TOFU avoids by design.
 
