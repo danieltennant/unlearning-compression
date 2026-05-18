@@ -66,6 +66,8 @@ All three unlearning methods achieve forget_Q_A_Prob below the oracle threshold 
 
 ### 3.2 Quantization
 
+Each unlearned checkpoint was evaluated under two levels of post-training quantization applied at load time via bitsandbytes: 8-bit (LLM.int8()) and 4-bit (NF4). No retraining or calibration data is involved — the weights are simply loaded at reduced precision. The same evaluation harness used for the baseline was then run against each compressed version.
+
 ![Quantization results](figures/quantization.png)
 
 **Knowledge recovery** (`forget_Q_A_Prob`, lower = better unlearning):
@@ -93,6 +95,8 @@ All three unlearning methods achieve forget_Q_A_Prob below the oracle threshold 
 **4-bit** produces large knowledge recovery in all cases while model utility is preserved or improved. GradDiff and RMU are similarly vulnerable (0.672 and 0.649), recovering to roughly two-thirds of full-model probability. SimNPO is substantially more robust (0.210), consistent with the larger weight perturbations SimNPO produces being less completely erased by quantization. All three methods remain above the oracle threshold of 0.104 after 4-bit quantization.
 
 ### 3.3 Magnitude pruning
+
+Each unlearned checkpoint was evaluated at three sparsity levels — 10%, 20%, and 30% — using global unstructured magnitude pruning. All linear layer weights are collected, a global threshold is computed at the target sparsity percentile, and all weights below that threshold are zeroed in-place. Pruning is applied after loading in float16 with no retraining. Because the threshold is global rather than per-layer, sparsity is not uniform across the network — layers with a higher proportion of small weights are pruned more heavily.
 
 ![Pruning results](figures/pruning.png)
 
