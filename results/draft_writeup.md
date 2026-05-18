@@ -135,7 +135,7 @@ To understand why the methods differ in their vulnerability to compression, we c
 | Attention QKV | 2.4e-5 | 4.9e-5 | 1.3e-5 |
 | Attention out | 2.8e-5 | 5.7e-5 | 1.7e-5 |
 
-*Per-element Frobenius norm of W_unlearned − W_full.*
+*Normalized magnitude of weight changes (W_unlearned − W_full), averaged across elements.*
 
 This is consistent with SimNPO's relative robustness to 4-bit quantization: larger changes are harder to round away. The difference in magnitude likely reflects the loss functions themselves — SimNPO's preference-based objective drives weights further from the pre-unlearning state than gradient ascent (GradDiff) or targeted activation steering (RMU).
 
