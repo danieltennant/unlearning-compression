@@ -4,9 +4,13 @@
 
 ## 1. Introduction
 
-Zhang et al. (2024) showed that applying 4-bit quantization to LLMs that have undergone machine unlearning recovers a substantial fraction of the supposedly forgotten knowledge, while 8-bit quantization has negligible effect. Their experiments used the MUSE benchmark with Llama-2-7B across six unlearning methods.
+Machine unlearning refers to techniques for selectively removing specific knowledge or capabilities from a trained model without retraining from scratch. Full retraining is expensive and often impractical for large models, so unlearning has emerged as a practical tool for several use cases: compliance with data deletion requests under regulations like GDPR, removal of copyrighted content a model was trained on, and — most relevant for AI safety — the targeted removal of dangerous capabilities such as knowledge of weapons synthesis or other hazardous content.
 
-We replicate this finding on TOFU, a different benchmark with a different model family (Llama-3.1-8B-Instruct), and extend it to magnitude pruning, a structurally different compression method not tested in the original paper. We test three unlearning methods that differ substantially in mechanism: GradDiff, SimNPO, and RMU.
+The safety application is particularly motivated. As AI systems become more capable, the ability to selectively remove harmful knowledge while preserving general capability is increasingly valuable. If a model can be trained to assist with dangerous tasks, unlearning offers a potential remediation pathway: identify the unwanted capability, apply an unlearning method, and deploy the modified model. Several major AI labs and government bodies have pointed to unlearning as a component of a responsible deployment toolkit.
+
+The problem this paper investigates is whether unlearning is actually doing what it appears to do. Modern LLMs are rarely deployed in their original form. They are routinely compressed — quantized to 4-bit or 8-bit precision to run on consumer hardware, or pruned to reduce memory and latency. If a model is unlearned and then compressed for deployment, does the unlearning hold? Zhang et al. (2024) showed that it often does not: applying 4-bit quantization to models that have undergone machine unlearning recovers a substantial fraction of the supposedly forgotten knowledge. A developer who tests an unlearned model at full precision, then distributes a quantized version, may be shipping a model that has silently recovered the knowledge they intended to remove.
+
+Zhang et al.'s experiments used the MUSE benchmark with Llama-2-7B across six unlearning methods. We replicate their finding on TOFU, a different benchmark with a different model family (Llama-3.1-8B-Instruct), and extend it to magnitude pruning, a structurally different compression method not tested in the original paper. We also investigate the weight-level mechanism behind the vulnerability, and find that the unlearning methods differ in how they store the forgetting signal in the model's weights — which determines how much of that signal survives compression.
 
 ---
 
