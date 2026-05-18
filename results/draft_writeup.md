@@ -187,3 +187,20 @@ All three unlearning methods, despite their different objectives, store forget-s
 ## 6. Conclusion
 
 Compression reverses unlearning across all methods and compression types tested. The suppressed knowledge recovers, model utility is preserved, and neither quantization nor pruning produces degradation that would alert a developer to the problem. A model validated as unlearned at full precision and then compressed for deployment may be neither.
+
+---
+
+## Appendix
+
+### Code and models
+
+Replication instructions, trained model checkpoints on HuggingFace, and repository structure are documented in the [README](../README.md).
+
+### Resources
+
+The following papers were downloaded locally and are referenced throughout:
+
+- **Zhang et al. (2024)** — "Catastrophic Failure of LLM Unlearning via Quantization": [arxiv.org/abs/2410.16454](https://arxiv.org/abs/2410.16454) · [`guo-2024-unlearning-quantization.pdf`](../../resources/guo-2024-unlearning-quantization.pdf)
+- **Open Unlearning (2025)** — framework, benchmarks, and survey: [`openunlearning-2025.pdf`](../../resources/openunlearning-2025.pdf)
+- **Maini et al. (2024)** — "TOFU: A Task of Fictitious Unlearning for LLMs": [locuslab.github.io/tofu](https://locuslab.github.io/tofu/)
+- **Shi et al. (2024)** — "MUSE: Machine Unlearning Six-Way Evaluation for Language Models"
