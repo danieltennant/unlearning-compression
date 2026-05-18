@@ -1,12 +1,10 @@
 # unlearning-compression
 
-Does compression reverse machine unlearning?
+Replication and extension of Zhang et al. (2024), who showed that 4-bit quantization recovers a substantial fraction of knowledge that LLMs have undergone machine unlearning to forget. This project replicates that finding on the [TOFU](https://locuslab.github.io/tofu/) benchmark with Llama-3.1-8B-Instruct, extends it to magnitude pruning, tests three unlearning methods (GradDiff, SimNPO, RMU), and includes a weight-level analysis of why each method differs in its vulnerability.
 
-[Zhang et al. (2024)](https://arxiv.org/abs/2410.16454) showed that quantizing an unlearned LLM recovers 83% of supposedly forgotten knowledge on average, using NEWS and BOOKS datasets. This project translates that finding to the [TOFU](https://locuslab.github.io/tofu/) benchmark — a standardized unlearning testbed with 450+ public checkpoints via [open-unlearning](https://github.com/locuslab/open-unlearning) — and extends it to magnitude pruning and SVD truncation.
+Full results and analysis: [`results/draft_writeup.md`](results/draft_writeup.md)
 
-The core hypothesis transfers: if utility-constrained unlearning suppresses rather than erases knowledge, that should be visible under any compression method that reduces weight perturbations, not just quantization. TOFU provides a cleaner test than NEWS/BOOKS because the forget set is entirely synthetic, eliminating confounds from the model's pretraining exposure.
-
-If the failure generalizes across compression methods, it substantially weakens the safety case for unlearning as a capability control. If it doesn't, that points toward something specific about how quantization interacts with unlearning weight perturbations — which is equally useful for understanding fixes.
+---
 
 ## Setup
 
@@ -16,115 +14,103 @@ cd unlearning-compression
 uv sync
 ```
 
-## Structure
+Requires a CUDA GPU. All training and compression sweeps were run on a single H100 80GB.
 
-```
-src/compress/
-    quantize.py     # bitsandbytes 4-bit / 8-bit quantization
-    prune.py        # unstructured magnitude pruning
-    svd.py          # SVD truncation
-experiments/        # sweep scripts
-results/            # output (gitignored)
-notebooks/          # analysis
-open-unlearning/    # submodule — eval harness and checkpoints
-```
+---
 
-## Compression methods
+## Trained checkpoints
 
-| Method | Variants |
+The three unlearned models are available on HuggingFace:
+
+| Method | HuggingFace ID |
 |---|---|
-| Quantization | 4-bit, 8-bit (bitsandbytes) |
-| Magnitude pruning | 10%, 20%, 30% sparsity |
-| SVD truncation | Retain top 90%, 80%, 70% of singular values |
+| GradDiff (α=1) | [dtennant/tofu-llama-8b-graddiff-alpha1](https://huggingface.co/dtennant/tofu-llama-8b-graddiff-alpha1) |
+| SimNPO | [dtennant/tofu-llama-8b-simnpo](https://huggingface.co/dtennant/tofu-llama-8b-simnpo) |
+| RMU (layer 7, scoeff 2) | [dtennant/tofu-llama-8b-rmu](https://huggingface.co/dtennant/tofu-llama-8b-rmu) |
 
-## Results
+Base model: [open-unlearning/tofu_Llama-3.1-8B-Instruct_full](https://huggingface.co/open-unlearning/tofu_Llama-3.1-8B-Instruct_full)
+Oracle (retain90): [open-unlearning/tofu_Llama-3.1-8B-Instruct_retain90](https://huggingface.co/open-unlearning/tofu_Llama-3.1-8B-Instruct_retain90)
 
-All experiments use the TOFU benchmark (`forget10` split, Llama-3.2-1B-Instruct and Llama-3.1-8B-Instruct). Primary metrics: `forget_Q_A_Prob` (probability assigned to correct forget-set answers — low means good unlearning), `model_utility` (retain-set QA performance — high means model still functions).
+---
 
-### Quantization
+## Replication
 
-4-bit quantization consistently recovers suppressed knowledge. 8-bit quantization has negligible effect.
+### 1. Train unlearned models (or skip and use the HF checkpoints above)
 
-**1B GradDiff α1** (baseline: `forget_Q_A_Prob = 0.061`, `model_utility = 0.456`):
+**GradDiff and SimNPO:**
+```bash
+bash sweeps/2026-05-11-8b.sh
+```
+Trains 8B SimNPO and runs the full compression sweep for both GradDiff and SimNPO (quantization + pruning). The GradDiff checkpoint is loaded from HuggingFace; SimNPO is trained from scratch and pushed to HF after training.
 
-| Compression | forget_Q_A_Prob | model_utility | Recovery |
-|---|---|---|---|
-| None | 0.061 | 0.456 | — |
-| 4-bit | 0.359 | 0.440 | **6×** |
-| 8-bit | 0.066 | 0.449 | negligible |
+**RMU:**
+```bash
+bash sweeps/2026-05-13-8b-rmu.sh
+```
+Trains 8B RMU (layer 7, scoeff=2, lr=1e-5) and runs the full compression sweep.
 
-**1B SimNPO** (baseline: `forget_Q_A_Prob = 0.110`, `model_utility = 0.592`):
+Both scripts must be run from `/workspace/unlearning-compression` on a pod with `HF_HOME` set and `huggingface-cli` logged in. Update paths at the top of each script if your environment differs.
 
-| Compression | forget_Q_A_Prob | model_utility | Recovery |
-|---|---|---|---|
-| None | 0.110 | 0.592 | — |
-| 4-bit | 0.223 | 0.453 | 2× |
+### 2. Evaluate a checkpoint under compression
 
-**8B GradDiff α1** (baseline: `forget_Q_A_Prob = 0.028`, `model_utility = 0.465`):
+```bash
+python experiments/eval_compressed.py \
+    --model_id dtennant/tofu-llama-8b-graddiff-alpha1 \
+    --compression quantize --level 4 \
+    --forget_split forget10 \
+    --output_dir results/
+```
 
-| Compression | forget_Q_A_Prob | model_utility | Recovery |
-|---|---|---|---|
-| None | 0.028 | 0.465 | — |
-| 4-bit | 0.672 | 0.589 | **24×** |
-| 8-bit | 0.033 | 0.467 | negligible |
+`--compression` accepts `none`, `quantize` (with `--level 4` or `8`), or `prune` (with `--level 0.1`, `0.2`, `0.3`).
 
-The 4-bit recovery effect is stronger at 8B than 1B (24× vs 6×). The 8B model achieves stronger unlearning at full precision but is proportionally more vulnerable to quantization. This is consistent with the Zhang et al. mechanism: utility-constrained unlearning produces weight perturbations smaller than the quantization step size, so the model snaps back to its pre-unlearning quantized values.
+### 3. Weight delta analysis
 
-Weight delta analysis confirms this mechanistically: every weight change from both GradDiff and SimNPO falls within the int4 quantization step (max delta ≈ 2.2% of Δ_int4). 8-bit quantization is safe because Δ_int8 is 16× smaller than Δ_int4.
+Computes per-weight change magnitudes and pruning overlap enrichment for each method:
 
-### Magnitude pruning
+```bash
+python experiments/weight_delta_analysis.py \
+    --full_model_id open-unlearning/tofu_Llama-3.1-8B-Instruct_full \
+    --unlearned_model_id dtennant/tofu-llama-8b-graddiff-alpha1 \
+    --output_dir results/weight_delta_8b_graddiff
+```
 
-Pruning recovers unlearned knowledge by zeroing the small-magnitude weights that disproportionately carry the unlearning signal.
+Repeat for each method. Requires ~32GB CPU RAM to load two 8B models simultaneously.
 
-**1B GradDiff α1:**
+### 4. Reproduce figures
 
-| Compression | forget_Q_A_Prob | model_utility |
-|---|---|---|
-| None | 0.061 | 0.456 |
-| 10% pruning | 0.737 | 0.567 |
-| 30% pruning | 0.126 | 0.279 |
+```bash
+python experiments/plot_results.py
+```
 
-**1B SimNPO:**
+Saves `results/figures/quantization.{pdf,png}` and `results/figures/pruning.{pdf,png}`.
 
-| Compression | forget_Q_A_Prob | model_utility |
-|---|---|---|
-| None | 0.110 | 0.592 |
-| 10% pruning | 0.307 | 0.550 |
-| 30% pruning | 0.125 | 0.269 |
+---
 
-**8B GradDiff α1:**
+## Repository structure
 
-| Compression | forget_Q_A_Prob | model_utility |
-|---|---|---|
-| None | 0.028 | 0.465 |
-| 10% pruning | 0.187 | 0.543 |
-| 30% pruning | 0.938 | 0.631 |
+```
+experiments/
+    eval_compressed.py          # evaluate any checkpoint under compression
+    weight_delta_analysis.py    # per-weight delta magnitude and pruning overlap
+    nnsight_analysis.py         # logit lens + activation patching (in progress)
+    plot_results.py             # generate figures
+results/
+    draft_writeup.md            # full write-up with results and analysis
+    figures/                    # generated figures
+    weight_delta_8b_*/          # weight delta analysis output (gitignored)
+src/compress/
+    quantize.py                 # bitsandbytes 4-bit / 8-bit quantization
+    prune.py                    # unstructured magnitude pruning
+    svd.py                      # SVD truncation (experimental)
+sweeps/
+    2026-05-11-8b.sh            # GradDiff + SimNPO training and compression sweep
+    2026-05-13-8b-rmu.sh        # RMU training and compression sweep
+    2026-05-analysis.sh         # weight delta + mechanistic analysis
+    archive/                    # earlier exploratory scripts (1B, SVD experiments)
+open-unlearning/                # submodule — eval harness and base checkpoints
+```
 
-At 10% sparsity the 1B model recovers more than the 8B (0.737 vs 0.187). At 30% the pattern reverses: the 8B fully recovers while the 1B degrades. Weight delta analysis explains why: GradDiff concentrates its unlearning signal on small-magnitude attention weights (5.89× enrichment in attn_out at 10% sparsity), which pruning removes first. SimNPO shows high enrichment across all layer types.
-
-### SVD
-
-Three implementations tried, none yet successful at meaningful compression on 1B models.
-
-**Naive per-layer SVD** (2026-04-23): Model utility collapses at all tested retain ratios (90/80/70%). Known limitation — no activation awareness, approximation error compounds across all transformer blocks.
-
-**Activation-aware SVD / ASVD** (diagonal scaling, 2026-04-28): Scales weights by √(E[x²]) before truncation. Utility still collapses (model_utility = 0.245 at 90% retain ratio vs 0.456 baseline), qualitatively worse than pruning or quantization. Two root causes identified: (1) diagonal scaling ignores activation covariance; (2) at 90% singular value retention, the factored representation is 1.1–1.8× *larger* than the original weight matrix depending on layer shape — there is no actual parameter compression.
-
-**Cholesky-whitened SVD** (SVD-LLM method, 2026-04-29): Accounts for the full activation covariance E[xx^T] via Cholesky whitening before truncation, minimising the true output error E[‖(W−W̃)x‖²]. Tested on the 1B retain90 baseline (uncompressed `model_utility = 0.593`):
-
-| Retain ratio | model_utility | Utility retained |
-|---|---|---|
-| None (baseline) | 0.593 | 100% |
-| 90% | 0.508 | 86% |
-| 80% | 0.354 | 60% |
-| 70% | 0.213 | 36% |
-
-The implementation is working correctly — utility degrades gracefully rather than collapsing — but at 90% singular value retention there is zero parameter compression for any layer in this model. Meaningful compression (factored parameter count below original) requires retain ratios below 80% for MLP layers and below 50% for attention layers, both of which cause substantial utility loss on 1B. The 1B model appears to have insufficient redundancy for SVD compression to be viable. Testing at 8B scale is pending.
-
-## Metrics
-
-- **Forget accuracy** — does the model recover knowledge of the forget set after compression?
-- **Retain accuracy** — does compression preserve performance on the retain set?
+---
 
 ## References
 
