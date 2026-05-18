@@ -122,6 +122,36 @@ All three unlearning methods achieve forget_Q_A_Prob below the oracle threshold 
 
 Recovery increases with sparsity for all three methods, and model utility is preserved throughout — at no pruning level does any method fall substantially below oracle utility. At 30% sparsity, GradDiff (0.938), SimNPO (0.935), and RMU (0.940) all recover nearly all suppressed knowledge. The three methods converge to the same outcome at 30%, despite showing different trajectories at lower sparsity: GradDiff and RMU reach near-full recovery already at 20% (0.979 and 0.963), while SimNPO requires 30% to reach comparable levels.
 
+### 3.4 Weight delta analysis
+
+To understand why the methods differ in their vulnerability to compression, we computed per-weight deltas (W_unlearned − W_full) across all linear layers for each method and measured two properties: the magnitude of weight changes, and whether those changes land disproportionately on the low-magnitude weights that magnitude pruning removes first.
+
+**Change magnitude.** SimNPO makes substantially larger weight changes than the other two methods — per-element delta norms are 2–4× larger than GradDiff's across all module types, and 3–4× larger than RMU's.
+
+| Module type | GradDiff | SimNPO | RMU |
+|---|---|---|---|
+| MLP down | 2.5e-5 | 5.4e-5 | 1.7e-5 |
+| MLP gate/up | 2.3e-5 | 5.2e-5 | 1.4e-5 |
+| Attention QKV | 2.4e-5 | 4.9e-5 | 1.3e-5 |
+| Attention out | 2.8e-5 | 5.7e-5 | 1.7e-5 |
+
+*Per-element Frobenius norm of W_unlearned − W_full.*
+
+This is consistent with SimNPO's relative robustness to 4-bit quantization: larger changes are harder to round away. The difference in magnitude likely reflects the loss functions themselves — SimNPO's preference-based objective drives weights further from the pre-unlearning state than gradient ascent (GradDiff) or targeted activation steering (RMU).
+
+**Pruning overlap.** We also measured whether the weights that changed most under unlearning are concentrated in the low-magnitude weights that magnitude pruning zeros first. We report an enrichment ratio: 1.0 means the highest-delta weights are uniformly distributed across the weight magnitude spectrum; values above 1.0 mean they cluster in the pruned region.
+
+| Module type | GradDiff | SimNPO | RMU |
+|---|---|---|---|
+| MLP down | 7.6× | 5.2× | 2.3× |
+| MLP gate/up | 5.8× | 5.7× | 2.5× |
+| Attention QKV | 2.9× | 6.1× | 1.9× |
+| Attention out | 6.9× | 4.8× | 2.1× |
+
+*Enrichment of high-delta weights in the bottom-10% lowest-magnitude weights (what 10% pruning removes).*
+
+GradDiff's unlearning signal is heavily concentrated in low-magnitude MLP weights — 76% of its highest-delta MLP down-projection weights fall in the bottom 10% lowest-magnitude weights. This directly explains why even 10–20% pruning substantially reverses GradDiff's unlearning. RMU's changes are more spread across the weight magnitude spectrum (only 23% concentrated in the pruned zone), yet full recovery still occurs by 30% pruning. SimNPO shows intermediate concentration, but its larger absolute changes mean more signal remains in the non-pruned weights even after the concentrated portion is removed.
+
 ---
 
 ## 4. Discussion
@@ -130,9 +160,9 @@ Recovery increases with sparsity for all three methods, and model utility is pre
 
 **Pruning as an additional vector.** Magnitude pruning also reverses unlearning at 8B scale, with recovery increasing monotonically with sparsity and model utility preserved throughout. At 30% global sparsity, all three methods recover nearly all suppressed knowledge while remaining fully functional. This is a structurally different compression mechanism from quantization — it removes weight components entirely rather than rounding them — suggesting the vulnerability is not specific to the quantization operation.
 
-**Method differences.** SimNPO is more robust to 4-bit quantization than GradDiff or RMU (0.210 vs 0.672/0.649). At the same time, SimNPO is among the worst-performing methods at high pruning sparsity, ultimately converging to the same near-full recovery at 30% as the other methods. The differential robustness to quantization vs pruning suggests these compression methods attack different aspects of the weight perturbations introduced by unlearning.
+**Method differences.** SimNPO is more robust to 4-bit quantization than GradDiff or RMU (0.210 vs 0.672/0.649). At the same time, SimNPO converges to the same near-full recovery at 30% pruning as the other methods. The weight delta analysis offers a partial explanation: SimNPO makes 2–4× larger weight changes than GradDiff or RMU, which makes its signal harder to erase by quantization rounding. Its pruning resistance at low sparsity follows from the same property — even where its changes are concentrated in low-magnitude weights, the larger absolute magnitude means more signal survives after those weights are removed. At 30% pruning, enough of the signal is eventually removed regardless.
 
-**The common denominator.** All three unlearning methods, despite their different objectives, appear to store forget-set suppression in a form that is disrupted by both weight quantization and weight removal. This is consistent with the hypothesis that post-hoc unlearning modifies weights in a way that is not deeply encoded — the perturbations are numerically small (quantization rounds them away) or concentrated in low-magnitude weights (pruning removes them). A method that genuinely erased knowledge rather than suppressing its surface expression might be expected to survive compression; none of the methods tested here do.
+**The common denominator.** All three unlearning methods, despite their different objectives, store forget-set suppression in a form that is disrupted by both weight quantization and weight removal. The weight delta analysis shows why: across all methods, the unlearning perturbations are small enough that quantization rounds them back toward the original weights, and concentrated enough in low-magnitude weights that pruning removes them. A method that genuinely erased knowledge rather than suppressing its surface expression might be expected to produce larger, more distributed weight changes that survive compression; none of the methods tested here do.
 
 ---
 
