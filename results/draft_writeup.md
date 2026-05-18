@@ -196,11 +196,9 @@ Compression reverses unlearning across all methods and compression types tested.
 
 Replication instructions, trained model checkpoints on HuggingFace, and repository structure are documented in the [README](../README.md).
 
-### Resources
+### References
 
-The following papers were downloaded locally and are referenced throughout:
-
-- **Zhang et al. (2024)** — "Catastrophic Failure of LLM Unlearning via Quantization": [arxiv.org/abs/2410.16454](https://arxiv.org/abs/2410.16454) · [`guo-2024-unlearning-quantization.pdf`](../../resources/guo-2024-unlearning-quantization.pdf)
-- **Open Unlearning (2025)** — framework, benchmarks, and survey: [`openunlearning-2025.pdf`](../../resources/openunlearning-2025.pdf)
-- **Maini et al. (2024)** — "TOFU: A Task of Fictitious Unlearning for LLMs": [locuslab.github.io/tofu](https://locuslab.github.io/tofu/)
-- **Shi et al. (2024)** — "MUSE: Machine Unlearning Six-Way Evaluation for Language Models"
+- **Zhang et al. (2024)** — "Catastrophic Failure of LLM Unlearning via Quantization": [arxiv.org/abs/2410.16454](https://arxiv.org/abs/2410.16454)
+- **Maini et al. (2024)** — "TOFU: A Task of Fictitious Unlearning for LLMs": [arxiv.org/abs/2401.06121](https://arxiv.org/abs/2401.06121)
+- **Shi et al. (2024)** — "MUSE: Machine Unlearning Six-Way Evaluation for Language Models": [arxiv.org/abs/2407.06460](https://arxiv.org/abs/2407.06460)
+- **open-unlearning** — eval framework and base checkpoints: [github.com/locuslab/open-unlearning](https://github.com/locuslab/open-unlearning)
