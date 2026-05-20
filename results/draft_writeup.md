@@ -2,6 +2,10 @@
 
 ---
 
+**TL;DR:** Machine unlearning methods are routinely tested at full precision, but deployed models are almost always compressed. I show that 4-bit quantization and magnitude pruning both reverse unlearning across three different methods (GradDiff, SimNPO, RMU) on the TOFU benchmark — recovering suppressed knowledge while leaving model utility intact, with no surface signal that anything has changed. Weight-level analysis suggests the reason: unlearning perturbations are small and concentrated in low-magnitude weights, exactly the weights that compression removes first.
+
+---
+
 ## 1. Introduction
 
 Machine unlearning refers to techniques for selectively removing specific knowledge or capabilities from a trained model without retraining from scratch. Full retraining is expensive and often impractical for large models, so unlearning has emerged as a practical tool for several use cases: compliance with data deletion requests under regulations like GDPR, removal of copyrighted content a model was trained on, and — most relevant for AI safety — the targeted removal of dangerous capabilities such as knowledge of weapons synthesis or other hazardous content.
