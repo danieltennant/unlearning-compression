@@ -2,7 +2,7 @@
 
 ---
 
-**TL;DR:** Machine unlearning methods are routinely tested at full precision, but deployed models are almost always compressed. I show that 4-bit quantization and magnitude pruning both reverse unlearning across three different methods (GradDiff, SimNPO, RMU) on the TOFU benchmark — recovering suppressed knowledge while leaving model utility intact, with no surface signal that anything has changed. Weight-level analysis suggests the reason: unlearning perturbations are small and concentrated in low-magnitude weights, exactly the weights that compression removes first.
+**TL;DR:** This was my first AI safety research project, produced as part of the [BlueDot Impact Technical AI Safety](https://bluedot.org/courses/technical-ai-safety) program sprint — please read it with that context in mind. Machine unlearning methods are routinely tested at full precision, but deployed models are almost always compressed. I show that 4-bit quantization and magnitude pruning both reverse unlearning across three different methods (GradDiff, SimNPO, RMU) on the TOFU benchmark — recovering suppressed knowledge while leaving model utility intact, with no surface signal that anything has changed. Weight-level analysis suggests the reason: unlearning perturbations are small and concentrated in low-magnitude weights, exactly the weights that compression removes first.
 
 ---
 
